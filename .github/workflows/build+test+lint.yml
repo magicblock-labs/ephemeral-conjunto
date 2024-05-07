@@ -1,0 +1,48 @@
+name: Build+Test+Lint
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-test-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node-version: [18.x]
+
+    steps:
+      - name: Checkout Conjunto
+        uses: actions/checkout@v4
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: 'conjunto-build_test_lint-cache-bust-000'
+          workspaces: |
+            . -> target
+          cache-targets: true
+          cache-all-crates: true
+          cache-on-failure: true
+
+      - name: Prebuild Conjunto Target Size
+        run: du -h -d1 target || true
+
+      - name: Cargo Build
+        run: make ci-build
+        shell: bash
+
+      - name: Cargo Clippy Lint
+        run: make ci-clippy
+        shell: bash
+
+      - name: Cargo Test
+        run: make ci-test
+        shell: bash
+
+      - name: List Conjunto Target Size
+        run: du -h -d1 target
