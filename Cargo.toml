@@ -1,0 +1,21 @@
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+split-debuginfo = "packed"
+
+[workspace]
+members = ["addresses"]
+
+resolver = "2"
+
+[workspace.package]
+version = "0.0.0"
+authors = ["MagicBlock Maintainers <maintainers@magicblock.gg>"]
+repository = "https://github.com/magicblock-labs/conjunto"
+homepage = "https://www.magicblock.gg"
+license = "Apache-2.0"
+edition = "2021"
+
+[workspace.dependencies]
+conjunto_addresses = { path = "addresses" }
+solana-sdk = "1.18.12"
