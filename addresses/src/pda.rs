@@ -320,13 +320,23 @@ mod tests {
         let buffer_addr = "E8NdkAGLLC3qnvphsXhqkjkXpRkdoiDpicSTTQJySVtG";
         let buffer_id = Pubkey::from_str(buffer_addr).unwrap();
 
-        let delegation_addr = "FW2ndLLAaYS7hHmoegYWHUtn41R1Az6N13PxqVcceyk7";
+        let delegation_addr = "CkieZJmrj6dLhwteG69LSutpWwRHiDJY9S8ua7xJ7CRW";
         let delegation_id = Pubkey::from_str(delegation_addr).unwrap();
 
+        let state_diff_addr = "BUrsNkRnqoWUJdGotRt1odFp2NH5b9tcciXzXNbNwBHr";
+        let state_diff_id = Pubkey::from_str(state_diff_addr).unwrap();
+
+        let commit_record_addr = "GiDjQqUKeKJwLH5kdbnCgFS2XPGAVjXo73JMoeVn3UZL";
+        let commit_record_id = Pubkey::from_str(commit_record_addr).unwrap();
+
         let buffer_pda = buffer_pda_from_pubkey(&delegated_id);
-        let delegation_pda = delegation_pda_from_pubkey(&buffer_id);
+        let delegation_pda = delegation_pda_from_pubkey(&delegated_id);
+        let state_diff_pda = state_diff_pda_from_pubkey(&delegated_id);
+        let commit_record_pda = commit_record_pda_from_pubkey(&delegated_id);
 
         assert_eq!(buffer_pda, buffer_id);
         assert_eq!(delegation_pda, delegation_id);
+        assert_eq!(state_diff_pda, state_diff_id);
+        assert_eq!(commit_record_pda, commit_record_id);
     }
 }

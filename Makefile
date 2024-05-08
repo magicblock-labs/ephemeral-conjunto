@@ -23,6 +23,7 @@ ci-clippy:
 ci-test:
 	cargo test \
 		-p conjunto_addresses \
+		-p conjunto_lockbox \
 		-- --test-threads=1 --nocapture
 
 .PHONY: fmt test test-log ci-build ci-clippy ci-test
