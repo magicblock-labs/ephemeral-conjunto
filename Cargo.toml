@@ -4,7 +4,7 @@ debug = true
 split-debuginfo = "packed"
 
 [workspace]
-members = ["addresses", "lockbox"]
+members = ["addresses", "core", "lockbox", "test-tools", "transwise"]
 
 resolver = "2"
 
@@ -18,8 +18,10 @@ edition = "2021"
 
 [workspace.dependencies]
 async-trait = "0.1.80"
-conjunto_addresses = { path = "addresses" }
-conjunto_lockbox = { path = "lockbox" }
+conjunto-addresses = { path = "addresses" }
+conjunto-core = { path = "core" }
+conjunto-lockbox = { path = "lockbox" }
+conjunto-test-tools = { path = "test-tools" }
 paste = "1.0"
 solana-rpc-client = "1.18.12"
 solana-rpc-client-api = "1.18.12"

@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use conjunto_addresses::cluster::RpcCluster;
+use conjunto_core::{errors::CoreResult, AccountProvider};
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
 use solana_rpc_client_api::{client_error::ErrorKind, request::RpcError};
 use solana_sdk::{
@@ -7,9 +8,6 @@ use solana_sdk::{
     commitment_config::{CommitmentConfig, CommitmentLevel},
     pubkey::Pubkey,
 };
-
-use super::AccountProvider;
-use crate::errors::LockboxResult;
 
 #[derive(Default)]
 pub struct RpcAccountProviderConfig {
@@ -44,7 +42,7 @@ impl AccountProvider for RpcAccountProvider {
     async fn get_account(
         &self,
         pubkey: &Pubkey,
-    ) -> LockboxResult<Option<Account>> {
+    ) -> CoreResult<Option<Account>> {
         let account = match self.rpc_client.get_account(pubkey).await {
             Ok(acc) => Some(acc),
             Err(err) => match err.kind() {
@@ -66,7 +64,7 @@ impl AccountProvider for RpcAccountProvider {
     async fn get_multiple_accounts(
         &self,
         pubkeys: &[Pubkey],
-    ) -> LockboxResult<Vec<Option<Account>>> {
+    ) -> CoreResult<Vec<Option<Account>>> {
         Ok(self.rpc_client.get_multiple_accounts(pubkeys).await?)
     }
 }

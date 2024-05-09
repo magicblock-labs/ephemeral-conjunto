@@ -1,5 +1,5 @@
 [package]
-name = "conjunto-addresses"
+name = "conjunto-test-tools"
 version.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -8,5 +8,6 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-paste = { workspace = true }
+async-trait = { workspace = true }
+conjunto-core = { workspace = true }
 solana-sdk = { workspace = true }

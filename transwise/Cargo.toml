@@ -1,5 +1,5 @@
 [package]
-name = "conjunto-lockbox"
+name = "conjunto-transwise"
 version.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -8,11 +8,8 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-async-trait = { workspace = true }
-conjunto-addresses = { workspace = true }
 conjunto-core = { workspace = true }
-solana-rpc-client = { workspace = true }
-solana-rpc-client-api = { workspace = true }
+conjunto-lockbox = { workspace = true }
 solana-sdk = { workspace = true }
 thiserror = { workspace = true }
 

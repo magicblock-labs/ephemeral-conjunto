@@ -663,7 +663,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "conjunto_addresses"
+name = "conjunto-addresses"
 version = "0.0.0"
 dependencies = [
  "paste",
@@ -671,13 +671,46 @@ dependencies = [
 ]
 
 [[package]]
-name = "conjunto_lockbox"
+name = "conjunto-core"
 version = "0.0.0"
 dependencies = [
  "async-trait",
- "conjunto_addresses",
+ "solana-rpc-client-api",
+ "solana-sdk",
+ "thiserror",
+]
+
+[[package]]
+name = "conjunto-lockbox"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "conjunto-addresses",
+ "conjunto-core",
+ "conjunto-test-tools",
  "solana-rpc-client",
  "solana-rpc-client-api",
+ "solana-sdk",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "conjunto-test-tools"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "conjunto-core",
+ "solana-sdk",
+]
+
+[[package]]
+name = "conjunto-transwise"
+version = "0.0.0"
+dependencies = [
+ "conjunto-core",
+ "conjunto-lockbox",
+ "conjunto-test-tools",
  "solana-sdk",
  "thiserror",
  "tokio",

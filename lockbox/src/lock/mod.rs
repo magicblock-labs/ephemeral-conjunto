@@ -1,18 +1,17 @@
 use conjunto_addresses::pda;
+use conjunto_core::AccountProvider;
 use solana_sdk::pubkey::Pubkey;
 
 use crate::{
     accounts::{
         predicates::is_owned_by_delegation_program,
         rpc_account_provider::{RpcAccountProvider, RpcAccountProviderConfig},
-        AccountProvider,
     },
     errors::LockboxResult,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LockInconsistency {
-    DelegateAccountNotFound,
     BufferAccountNotFound,
     DelegationAccountNotFound,
     BufferAccountInvalidOwner,
@@ -21,23 +20,52 @@ pub enum LockInconsistency {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AccountLockState {
+    /// The account is not present on chain and thus not locked either
+    /// In this case we assume that this is an account that temporarily exists
+    /// on the ephemeral validator and will not have to be undelegated.
+    NewAccount,
+    /// The account was found on chain and is not locked and therefore should
+    /// not be used as writable on the ephemeral validator
     Unlocked,
     // TODO(thlorenz): what about state diff and commit record
     // - are they expected at the PDA addresses?
     // - are they optional?
     // - should we indicate if they were found?
     // - if so what predicates do they need to match?
+    /// The account was found on chain in a proper locked state which means we
+    /// also found the related accounts like the buffer and delegation
     Locked {
         delegated_id: Pubkey,
         buffer_pda: Pubkey,
         delegation_pda: Pubkey,
     },
+    /// The account was found on chain and was partially locked which means that
+    /// it is owned by the delegation program but one or more of the related
+    /// accounts were either not present or not owned by the delegation program
     Inconsistent {
         delegated_id: Pubkey,
         buffer_pda: Pubkey,
         delegation_pda: Pubkey,
         inconsistencies: Vec<LockInconsistency>,
     },
+}
+
+impl AccountLockState {
+    pub fn is_new(&self) -> bool {
+        matches!(self, AccountLockState::NewAccount)
+    }
+
+    pub fn is_locked(&self) -> bool {
+        matches!(self, AccountLockState::Locked { .. })
+    }
+
+    pub fn is_unlocked(&self) -> bool {
+        matches!(self, AccountLockState::Unlocked)
+    }
+
+    pub fn is_inconsistent(&self) -> bool {
+        matches!(self, AccountLockState::Inconsistent { .. })
+    }
 }
 
 pub struct AccountLockStateProvider<T: AccountProvider> {
@@ -73,14 +101,7 @@ impl<T: AccountProvider> AccountLockStateProvider<T> {
         let account = match self.account_provider.get_account(pubkey).await? {
             Some(acc) => acc,
             None => {
-                return Ok(AccountLockState::Inconsistent {
-                    delegated_id: *pubkey,
-                    buffer_pda,
-                    delegation_pda,
-                    inconsistencies: vec![
-                        LockInconsistency::DelegateAccountNotFound,
-                    ],
-                });
+                return Ok(AccountLockState::NewAccount);
             }
         };
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use conjunto_lockbox::{accounts::AccountProvider, errors::LockboxResult};
+use conjunto_core::{errors::CoreResult, AccountProvider};
 use solana_sdk::{account::Account, pubkey::Pubkey};
 
 #[derive(Default)]
@@ -20,14 +20,14 @@ impl AccountProvider for AccountProviderStub {
     async fn get_account(
         &self,
         pubkey: &Pubkey,
-    ) -> LockboxResult<Option<Account>> {
+    ) -> CoreResult<Option<Account>> {
         Ok(self.accounts.get(pubkey).cloned())
     }
 
     async fn get_multiple_accounts(
         &self,
         pubkeys: &[Pubkey],
-    ) -> conjunto_lockbox::errors::LockboxResult<Vec<Option<Account>>> {
+    ) -> CoreResult<Vec<Option<Account>>> {
         Ok(pubkeys
             .iter()
             .map(|pubkey| self.accounts.get(pubkey).cloned())
