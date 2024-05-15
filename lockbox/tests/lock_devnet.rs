@@ -1,8 +1,9 @@
 use std::str::FromStr;
 
-use conjunto_lockbox::{
-    accounts::{RpcAccountProvider, RpcAccountProviderConfig},
-    AccountLockState, AccountLockStateProvider,
+use conjunto_lockbox::{AccountLockState, AccountLockStateProvider};
+use conjunto_providers::{
+    rpc_account_provider::RpcAccountProvider,
+    rpc_provider_config::RpcProviderConfig,
 };
 use solana_sdk::{pubkey::Pubkey, system_program};
 
@@ -22,7 +23,7 @@ async fn test_known_delegation() {
 
     let lockstate_provider =
         AccountLockStateProvider::<RpcAccountProvider>::new(
-            RpcAccountProviderConfig::default(),
+            RpcProviderConfig::default(),
         );
 
     let state = lockstate_provider
@@ -46,7 +47,7 @@ async fn test_system_account_not_delegated() {
 
     let lockstate_provider =
         AccountLockStateProvider::<RpcAccountProvider>::new(
-            RpcAccountProviderConfig::default(),
+            RpcProviderConfig::default(),
         );
 
     let state = lockstate_provider

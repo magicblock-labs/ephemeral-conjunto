@@ -1,5 +1,5 @@
 [package]
-name = "conjunto-lockbox"
+name = "conjunto-director-pubsub"
 version.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -8,16 +8,20 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-async-trait = { workspace = true }
 conjunto-addresses = { workspace = true }
 conjunto-core = { workspace = true }
+conjunto-guidepoint = { workspace = true }
 conjunto-providers = { workspace = true }
+log = { workspace = true }
+futures-util = { workspace = true }
 serde = { workspace = true }
-solana-rpc-client = { workspace = true }
+serde_json = { workspace = true }
 solana-rpc-client-api = { workspace = true }
-solana-sdk = { workspace = true }
 thiserror = { workspace = true }
+tokio-tungstenite = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 conjunto-test-tools = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+solana-sdk = { workspace = true }

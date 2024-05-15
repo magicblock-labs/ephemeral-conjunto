@@ -1,8 +1,9 @@
-use conjunto_lockbox::{
-    accounts::{RpcAccountProvider, RpcAccountProviderConfig},
-    AccountLockStateProvider,
+use conjunto_lockbox::AccountLockStateProvider;
+use conjunto_providers::{
+    rpc_account_provider::RpcAccountProvider,
+    rpc_provider_config::RpcProviderConfig,
 };
-use solana_sdk::transaction::SanitizedTransaction;
+use solana_sdk::transaction::{SanitizedTransaction, VersionedTransaction};
 
 use crate::{
     errors::TranswiseResult,
@@ -17,7 +18,7 @@ pub struct Transwise {
 }
 
 impl Transwise {
-    pub fn new(config: RpcAccountProviderConfig) -> Self {
+    pub fn new(config: RpcProviderConfig) -> Self {
         let account_lock_state_provider =
             AccountLockStateProvider::<RpcAccountProvider>::new(config);
         Self {
@@ -25,7 +26,19 @@ impl Transwise {
         }
     }
 
-    pub async fn guide_transaction(
+    pub async fn guide_versioned_transaction(
+        &self,
+        tx: &VersionedTransaction,
+    ) -> TranswiseResult<Endpoint> {
+        let account_metas = TransAccountMetas::from_versioned_transaction(
+            tx,
+            &self.account_lock_state_provider,
+        )
+        .await?;
+        Ok(account_metas.into_endpoint())
+    }
+
+    pub async fn guide_sanitized_transaction(
         &self,
         tx: &SanitizedTransaction,
     ) -> TranswiseResult<Endpoint> {

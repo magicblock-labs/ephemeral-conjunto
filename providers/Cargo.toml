@@ -1,5 +1,5 @@
 [package]
-name = "conjunto-lockbox"
+name = "conjunto-providers"
 version.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -11,13 +11,10 @@ edition.workspace = true
 async-trait = { workspace = true }
 conjunto-addresses = { workspace = true }
 conjunto-core = { workspace = true }
-conjunto-providers = { workspace = true }
-serde = { workspace = true }
 solana-rpc-client = { workspace = true }
 solana-rpc-client-api = { workspace = true }
 solana-sdk = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-conjunto-test-tools = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

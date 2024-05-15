@@ -1,0 +1,33 @@
+[package]
+name = "conjunto-director-rpc"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+base64 = { workspace = true }
+bincode = { workspace = true }
+bs58 = { workspace = true }
+conjunto-addresses = { workspace = true }
+conjunto-lockbox = { workspace = true }
+conjunto-providers = { workspace = true }
+conjunto-transwise = { workspace = true }
+jsonrpsee = { workspace = true, features = ["macros", "server"] }
+log = { workspace = true }
+# Needed for (not yet working CORS)
+hyper = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+solana-account-decoder = { workspace = true }
+solana-sdk = { workspace = true }
+solana-rpc-client-api = { workspace = true }
+solana-transaction-status = { workspace = true }
+thiserror = { workspace = true }
+# Needed for (not yet working CORS)
+tower = { workspace = true }
+# Needed for (not yet working CORS)
+tower-http = { workspace = true }

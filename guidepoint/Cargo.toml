@@ -1,5 +1,5 @@
 [package]
-name = "conjunto-lockbox"
+name = "conjunto-guidepoint"
 version.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -8,15 +8,8 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-async-trait = { workspace = true }
-conjunto-addresses = { workspace = true }
+log = { workspace = true }
 conjunto-core = { workspace = true }
-conjunto-providers = { workspace = true }
-serde = { workspace = true }
-solana-rpc-client = { workspace = true }
-solana-rpc-client-api = { workspace = true }
-solana-sdk = { workspace = true }
-thiserror = { workspace = true }
 
 [dev-dependencies]
 conjunto-test-tools = { workspace = true }

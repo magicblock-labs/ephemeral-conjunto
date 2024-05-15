@@ -1,16 +1,17 @@
 use conjunto_addresses::pda;
 use conjunto_core::AccountProvider;
+use conjunto_providers::{
+    rpc_account_provider::RpcAccountProvider,
+    rpc_provider_config::RpcProviderConfig,
+};
+use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
 
 use crate::{
-    accounts::{
-        predicates::is_owned_by_delegation_program,
-        rpc_account_provider::{RpcAccountProvider, RpcAccountProviderConfig},
-    },
-    errors::LockboxResult,
+    accounts::predicates::is_owned_by_delegation_program, errors::LockboxResult,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LockInconsistency {
     BufferAccountNotFound,
     DelegationAccountNotFound,
@@ -18,7 +19,7 @@ pub enum LockInconsistency {
     DelegationAccountInvalidOwner,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AccountLockState {
     /// The account is not present on chain and thus not locked either
     /// In this case we assume that this is an account that temporarily exists
@@ -74,7 +75,7 @@ pub struct AccountLockStateProvider<T: AccountProvider> {
 
 impl<T: AccountProvider> AccountLockStateProvider<T> {
     pub fn new(
-        config: RpcAccountProviderConfig,
+        config: RpcProviderConfig,
     ) -> AccountLockStateProvider<RpcAccountProvider> {
         let rpc_account_provider = RpcAccountProvider::new(config);
         AccountLockStateProvider::with_provider(rpc_account_provider)

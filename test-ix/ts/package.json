@@ -1,0 +1,14 @@
+{
+  "name": "conjunto-test-integration",
+  "version": "0.0.0",
+  "description": "TypeScript tests for the conjunto director.",
+  "private": true,
+  "devDependencies": {
+    "@solana/web3.js": "^1.91.8",
+    "@types/tape": "^5.6.4",
+    "esbuild": "^0.21.2",
+    "esbuild-runner": "^2.2.2",
+    "prettier": "^3.2.5",
+    "tape": "^5.7.5"
+  }
+}

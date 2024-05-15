@@ -1,20 +1,24 @@
 use std::ops::Deref;
 
-use conjunto_core::{AccountProvider, TransactionAccountsHolder};
+use conjunto_core::{AccountProvider, AccountsHolder};
 use conjunto_lockbox::{AccountLockState, AccountLockStateProvider};
-use solana_sdk::{pubkey::Pubkey, transaction::SanitizedTransaction};
+use serde::{Deserialize, Serialize};
+use solana_sdk::{
+    pubkey::Pubkey,
+    transaction::{SanitizedTransaction, VersionedTransaction},
+};
 
 use crate::errors::TranswiseResult;
 
 // -----------------
 // SanitizedTransactionAccountsHolder
 // -----------------
-pub struct SanitizedTransactionAccountsHolder {
+pub struct TransactionAccountsHolder {
     writable: Vec<Pubkey>,
     readonly: Vec<Pubkey>,
 }
 
-impl From<&SanitizedTransaction> for SanitizedTransactionAccountsHolder {
+impl From<&SanitizedTransaction> for TransactionAccountsHolder {
     fn from(tx: &SanitizedTransaction) -> Self {
         let loaded = tx.get_account_locks_unchecked();
         let writable = loaded.writable.iter().map(|x| **x).collect();
@@ -22,7 +26,41 @@ impl From<&SanitizedTransaction> for SanitizedTransactionAccountsHolder {
         Self { writable, readonly }
     }
 }
-impl TransactionAccountsHolder for SanitizedTransactionAccountsHolder {
+
+impl From<&VersionedTransaction> for TransactionAccountsHolder {
+    fn from(tx: &VersionedTransaction) -> Self {
+        let static_accounts = tx.message.static_account_keys();
+        let mut writable = Vec::new();
+        let mut readonly = Vec::new();
+
+        for (idx, pubkey) in static_accounts.iter().enumerate() {
+            if tx.message.is_maybe_writable(idx) {
+                writable.push(*pubkey);
+            } else {
+                readonly.push(*pubkey);
+            }
+        }
+
+        let lookups = tx.message.address_table_lookups().unwrap_or_default();
+        for lookup in lookups {
+            let _writable_idxs = &lookup.writable_indexes;
+            let _readonly_idxs = &lookup.readonly_indexes;
+            // TODO(thlorenz): to properly support lookup tables we'd now have to do the following:
+            //
+            // 1. Fetch data of the lookup table
+            // 2. resolve the indexes to actual account keys
+            //
+            // However to do that there are two issues with this:
+            // 1. This method would have to be async and fetching that data results in more latency
+            // 2. Where do we fetch the table from, ephemeral or chain? Or first ephemeral and then chain?
+            //    The latter would result in even more latency.
+        }
+
+        Self { writable, readonly }
+    }
+}
+
+impl AccountsHolder for TransactionAccountsHolder {
     fn get_writable(&self) -> Vec<Pubkey> {
         self.writable.clone()
     }
@@ -34,7 +72,7 @@ impl TransactionAccountsHolder for SanitizedTransactionAccountsHolder {
 // -----------------
 // TransAccountMeta
 // -----------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TransAccountMeta {
     Writable {
         pubkey: Pubkey,
@@ -70,7 +108,7 @@ impl TransAccountMeta {
 // -----------------
 // Endpoint
 // -----------------
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Endpoint {
     Chain(TransAccountMetas),
     Ephemeral(TransAccountMetas),
@@ -90,9 +128,17 @@ impl Endpoint {
     pub fn is_unroutable(&self) -> bool {
         matches!(self, Endpoint::Unroutable { .. })
     }
+    pub fn into_account_metas(self) -> TransAccountMetas {
+        use Endpoint::*;
+        match self {
+            Chain(account_metas)
+            | Ephemeral(account_metas)
+            | Unroutable { account_metas, .. } => account_metas,
+        }
+    }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum UnroutableReason {
     InconsistentLocksEncountered {
         inconsistent_writables: Vec<Pubkey>,
@@ -107,7 +153,7 @@ pub enum UnroutableReason {
 // -----------------
 // TransAccountMetas
 // -----------------
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TransAccountMetas(pub Vec<TransAccountMeta>);
 
 impl Deref for TransAccountMetas {
@@ -119,20 +165,23 @@ impl Deref for TransAccountMetas {
 }
 
 impl TransAccountMetas {
+    pub async fn from_versioned_transaction<T: AccountProvider>(
+        tx: &VersionedTransaction,
+        lockbox: &AccountLockStateProvider<T>,
+    ) -> TranswiseResult<Self> {
+        let tx_accounts = TransactionAccountsHolder::from(tx);
+        Self::from_accounts_holder(&tx_accounts, lockbox).await
+    }
+
     pub async fn from_sanitized_transaction<T: AccountProvider>(
         tx: &SanitizedTransaction,
         lockbox: &AccountLockStateProvider<T>,
     ) -> TranswiseResult<Self> {
-        let tx_accounts = SanitizedTransactionAccountsHolder::from(tx);
-        let account_metas =
-            Self::from_accounts_holder(&tx_accounts, lockbox).await?;
-        Ok(account_metas)
+        let tx_accounts = TransactionAccountsHolder::from(tx);
+        Self::from_accounts_holder(&tx_accounts, lockbox).await
     }
 
-    pub async fn from_accounts_holder<
-        T: AccountProvider,
-        U: TransactionAccountsHolder,
-    >(
+    pub async fn from_accounts_holder<T: AccountProvider, U: AccountsHolder>(
         tx: &U,
         lockbox: &AccountLockStateProvider<T>,
     ) -> TranswiseResult<Self> {

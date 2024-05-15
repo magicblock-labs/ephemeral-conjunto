@@ -2,7 +2,7 @@
 
 use std::str::FromStr;
 
-use conjunto_lockbox::accounts::RpcAccountProviderConfig;
+use conjunto_providers::rpc_provider_config::RpcProviderConfig;
 use conjunto_test_tools::accounts::delegated_account_ids;
 use conjunto_transwise::Transwise;
 use solana_sdk::{
@@ -28,7 +28,7 @@ async fn main() {
         Pubkey::from_str("soLXiij6o94fntzfvn2meNybhNfPBviTVuyXLVEtDJ3")
             .unwrap();
 
-    let transwise = Transwise::new(RpcAccountProviderConfig::default());
+    let transwise = Transwise::new(RpcProviderConfig::default());
 
     // 1. Transferring to a delegated account
     {
@@ -39,8 +39,10 @@ async fn main() {
             Hash::default(),
         );
         let sanitized_tx = SanitizedTransaction::from_transaction_for_tests(tx);
-        let endpoint =
-            transwise.guide_transaction(&sanitized_tx).await.unwrap();
+        let endpoint = transwise
+            .guide_sanitized_transaction(&sanitized_tx)
+            .await
+            .unwrap();
         println!("{:#?}", endpoint);
         assert!(endpoint.is_ephemeral());
     }
@@ -54,8 +56,10 @@ async fn main() {
             Hash::default(),
         );
         let sanitized_tx = SanitizedTransaction::from_transaction_for_tests(tx);
-        let endpoint =
-            transwise.guide_transaction(&sanitized_tx).await.unwrap();
+        let endpoint = transwise
+            .guide_sanitized_transaction(&sanitized_tx)
+            .await
+            .unwrap();
         println!("{:#?}", endpoint);
         assert!(endpoint.is_chain());
     }
@@ -73,8 +77,10 @@ async fn main() {
             Hash::default(),
         );
         let sanitized_tx = SanitizedTransaction::from_transaction_for_tests(tx);
-        let endpoint =
-            transwise.guide_transaction(&sanitized_tx).await.unwrap();
+        let endpoint = transwise
+            .guide_sanitized_transaction(&sanitized_tx)
+            .await
+            .unwrap();
         println!("{:#?}", endpoint);
         assert!(endpoint.is_unroutable());
     }

@@ -1,5 +1,5 @@
 [package]
-name = "conjunto-test-tools"
+name = "conjunto-director"
 version.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -8,8 +8,9 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-async-trait = { workspace = true }
-conjunto-core = { workspace = true }
+conjunto-director-pubsub = { workspace = true }
+conjunto-director-rpc = { workspace = true }
+conjunto-providers = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
-solana-sdk = { workspace = true }
+tokio = { workspace = true }
