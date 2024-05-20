@@ -8,6 +8,7 @@ use solana_sdk::transaction::{SanitizedTransaction, VersionedTransaction};
 use crate::{
     errors::TranswiseResult,
     trans_account_meta::{Endpoint, TransAccountMetas},
+    validated_accounts::{ValidateAccountsConfig, ValidatedAccounts},
 };
 
 /// The API that allows us to guide a transaction given a cluster
@@ -26,27 +27,81 @@ impl Transwise {
         }
     }
 
+    /// Extracts information of all accounts involved in the transaction and
+    /// checks their lock state on chain.
+    pub async fn account_metas_from_versioned_transaction(
+        &self,
+        tx: &VersionedTransaction,
+    ) -> TranswiseResult<TransAccountMetas> {
+        TransAccountMetas::from_versioned_transaction(
+            tx,
+            &self.account_lock_state_provider,
+        )
+        .await
+    }
+
+    /// Extracts information of all accounts involved in the transaction and
+    /// checks their lock state on chain.
+    pub async fn account_metas_from_sanitized_transaction(
+        &self,
+        tx: &SanitizedTransaction,
+    ) -> TranswiseResult<TransAccountMetas> {
+        TransAccountMetas::from_sanitized_transaction(
+            tx,
+            &self.account_lock_state_provider,
+        )
+        .await
+    }
+
+    /// Extracts information of all accounts involved in the transaction,
+    /// checks their lock state on chain and based on that returns an endpoint.
     pub async fn guide_versioned_transaction(
         &self,
         tx: &VersionedTransaction,
     ) -> TranswiseResult<Endpoint> {
-        let account_metas = TransAccountMetas::from_versioned_transaction(
-            tx,
-            &self.account_lock_state_provider,
-        )
-        .await?;
-        Ok(account_metas.into_endpoint())
+        Ok(self
+            .account_metas_from_versioned_transaction(tx)
+            .await?
+            .into_endpoint())
     }
 
+    /// Extracts information of all accounts involved in the transaction,
+    /// checks their lock state on chain and based on that returns an endpoint.
     pub async fn guide_sanitized_transaction(
         &self,
         tx: &SanitizedTransaction,
     ) -> TranswiseResult<Endpoint> {
-        let account_metas = TransAccountMetas::from_sanitized_transaction(
-            tx,
-            &self.account_lock_state_provider,
-        )
-        .await?;
-        Ok(account_metas.into_endpoint())
+        Ok(self
+            .account_metas_from_sanitized_transaction(tx)
+            .await?
+            .into_endpoint())
+    }
+
+    /// Extracts information of all accounts involved in the transaction, validates
+    /// them and returns the result containing writable and readonly accounts.
+    /// The checks make sure that all writable accounts are either locked or conform
+    /// to what's specified in the config.
+    pub async fn validated_accounts_from_versioned_transaction(
+        &self,
+        tx: &VersionedTransaction,
+        config: &ValidateAccountsConfig,
+    ) -> TranswiseResult<ValidatedAccounts> {
+        let account_metas =
+            self.account_metas_from_versioned_transaction(tx).await?;
+        (&account_metas, config).try_into()
+    }
+
+    /// Extracts information of all accounts involved in the transaction, validates
+    /// them and returns the result containing writable and readonly accounts.
+    /// The checks make sure that all writable accounts are either locked or conform
+    /// to what's specified in the config.
+    pub async fn validated_accounts_from_sanitized_transaction(
+        &self,
+        tx: &SanitizedTransaction,
+        config: &ValidateAccountsConfig,
+    ) -> TranswiseResult<ValidatedAccounts> {
+        let account_metas =
+            self.account_metas_from_sanitized_transaction(tx).await?;
+        (&account_metas, config).try_into()
     }
 }

@@ -30,13 +30,10 @@ pub enum AccountLockState {
     /// The account was found on chain and is not locked and therefore should
     /// not be used as writable on the ephemeral validator
     Unlocked,
-    // TODO(thlorenz): what about state diff and commit record
-    // - are they expected at the PDA addresses?
-    // - are they optional?
-    // - should we indicate if they were found?
-    // - if so what predicates do they need to match?
     /// The account was found on chain in a proper locked state which means we
     /// also found the related accounts like the buffer and delegation
+    /// NOTE: commit records and state diff accountsk are not checked since an
+    /// account is delegated and then used before the validator commits a state change.
     Locked {
         delegated_id: Pubkey,
         delegation_pda: Pubkey,

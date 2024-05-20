@@ -271,28 +271,43 @@ impl TransAccountMetas {
         }
     }
 
-    fn locked_writables(&self) -> Vec<&TransAccountMeta> {
+    pub(crate) fn writable_pubkeys(&self) -> Vec<Pubkey> {
+        self.locked_writables()
+            .iter()
+            .chain(self.new_writables().iter())
+            .map(|x| *x.pubkey())
+            .collect()
+    }
+
+    pub(crate) fn readable_pubkeys(&self) -> Vec<Pubkey> {
+        self.iter()
+            .filter(|x| matches!(x, TransAccountMeta::Readonly { .. }))
+            .map(|x| *x.pubkey())
+            .collect()
+    }
+
+    pub(crate) fn locked_writables(&self) -> Vec<&TransAccountMeta> {
         self
             .iter()
             .filter(|x| matches!(x, TransAccountMeta::Writable { lockstate, .. } if lockstate.is_locked()))
             .collect()
     }
 
-    fn unlocked_writables(&self) -> Vec<&TransAccountMeta> {
+    pub(crate) fn unlocked_writables(&self) -> Vec<&TransAccountMeta> {
         self
             .iter()
             .filter(|x| matches!(x, TransAccountMeta::Writable { lockstate, .. } if lockstate.is_unlocked()))
             .collect()
     }
 
-    fn new_writables(&self) -> Vec<&TransAccountMeta> {
+    pub(crate) fn new_writables(&self) -> Vec<&TransAccountMeta> {
         self
             .iter()
             .filter(|x| matches!(x, TransAccountMeta::Writable { lockstate, .. } if lockstate.is_new()))
             .collect()
     }
 
-    fn inconsistent_writables(&self) -> Vec<&TransAccountMeta> {
+    pub(crate) fn inconsistent_writables(&self) -> Vec<&TransAccountMeta> {
         self
             .iter()
             .filter(|x| matches!(x, TransAccountMeta::Writable { lockstate, .. } if lockstate.is_inconsistent()))

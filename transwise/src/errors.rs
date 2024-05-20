@@ -1,3 +1,4 @@
+use solana_sdk::pubkey::Pubkey;
 use thiserror::Error;
 
 pub type TranswiseResult<T> = std::result::Result<T, TranswiseError>;
@@ -6,4 +7,16 @@ pub type TranswiseResult<T> = std::result::Result<T, TranswiseError>;
 pub enum TranswiseError {
     #[error("LockboxError")]
     LockboxError(#[from] conjunto_lockbox::errors::LockboxError),
+
+    #[error("Not all writable accounts are locked")]
+    NotAllWritablesLocked {
+        locked: Vec<Pubkey>,
+        unlocked: Vec<Pubkey>,
+    },
+
+    #[error("Writables inconsistent accounts")]
+    WritablesIncludeInconsistentAccounts { inconsistent: Vec<Pubkey> },
+
+    #[error("Writables include new accounts")]
+    WritablesIncludeNewAccounts { new_accounts: Vec<Pubkey> },
 }
