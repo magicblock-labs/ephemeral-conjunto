@@ -15,9 +15,6 @@ async fn test_known_delegation() {
     let delegated_addr = "8k2V7EzQtNg38Gi9HK5ZtQYp1YpGKNGrMcuGa737gZX4";
     let delegated_id = Pubkey::from_str(delegated_addr).unwrap();
 
-    let buffer_addr = "E8NdkAGLLC3qnvphsXhqkjkXpRkdoiDpicSTTQJySVtG";
-    let buffer_id = Pubkey::from_str(buffer_addr).unwrap();
-
     let delegation_addr = "CkieZJmrj6dLhwteG69LSutpWwRHiDJY9S8ua7xJ7CRW";
     let delegation_id = Pubkey::from_str(delegation_addr).unwrap();
 
@@ -35,7 +32,6 @@ async fn test_known_delegation() {
         state,
         AccountLockState::Locked {
             delegated_id,
-            buffer_pda: buffer_id,
             delegation_pda: delegation_id
         }
     );

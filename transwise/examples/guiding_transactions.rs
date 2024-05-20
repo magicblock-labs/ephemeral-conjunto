@@ -23,7 +23,7 @@ async fn main() {
     // account anywhere, on chain or in the ephemeral validator.
     let from_kp = Keypair::new();
 
-    let (delegated_id, _, _) = delegated_account_ids();
+    let (delegated_id, _) = delegated_account_ids();
     let unlocked_id =
         Pubkey::from_str("soLXiij6o94fntzfvn2meNybhNfPBviTVuyXLVEtDJ3")
             .unwrap();

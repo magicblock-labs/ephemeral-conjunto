@@ -13,7 +13,6 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LockInconsistency {
-    BufferAccountNotFound,
     DelegationAccountNotFound,
     BufferAccountInvalidOwner,
     DelegationAccountInvalidOwner,
@@ -24,6 +23,9 @@ pub enum AccountLockState {
     /// The account is not present on chain and thus not locked either
     /// In this case we assume that this is an account that temporarily exists
     /// on the ephemeral validator and will not have to be undelegated.
+    /// However in the short term we don't allow new accounts to be created inside
+    /// the validator which means that we reject any transactions that attempt to do
+    /// that
     NewAccount,
     /// The account was found on chain and is not locked and therefore should
     /// not be used as writable on the ephemeral validator
@@ -37,7 +39,6 @@ pub enum AccountLockState {
     /// also found the related accounts like the buffer and delegation
     Locked {
         delegated_id: Pubkey,
-        buffer_pda: Pubkey,
         delegation_pda: Pubkey,
     },
     /// The account was found on chain and was partially locked which means that
@@ -45,7 +46,6 @@ pub enum AccountLockState {
     /// accounts were either not present or not owned by the delegation program
     Inconsistent {
         delegated_id: Pubkey,
-        buffer_pda: Pubkey,
         delegation_pda: Pubkey,
         inconsistencies: Vec<LockInconsistency>,
     },
@@ -95,7 +95,6 @@ impl<T: AccountProvider> AccountLockStateProvider<T> {
         // we don't know which ones were there and which ones weren't and thus couldn't provide as
         // detailed information about the inconsistencies as we are now.
 
-        let buffer_pda = pda::buffer_pda_from_pubkey(pubkey);
         let delegation_pda = pda::delegation_pda_from_pubkey(pubkey);
 
         // 1. Make sure the delegate account exists at all
@@ -113,12 +112,7 @@ impl<T: AccountProvider> AccountLockStateProvider<T> {
 
         let mut inconsistencies = Vec::<LockInconsistency>::new();
 
-        // 3. Verify the buffer account exists and is owned by the delegation program
-        if let Some(xs) = self.verify_buffer_account(&buffer_pda).await? {
-            inconsistencies.extend(xs);
-        }
-
-        // 4. Verify the delegation account exists and is owned by the delegation program
+        // 3. Verify the delegation account exists and is owned by the delegation program
         if let Some(xs) =
             self.verify_delegation_account(&delegation_pda).await?
         {
@@ -128,37 +122,14 @@ impl<T: AccountProvider> AccountLockStateProvider<T> {
         if inconsistencies.is_empty() {
             Ok(AccountLockState::Locked {
                 delegated_id: *pubkey,
-                buffer_pda,
                 delegation_pda,
             })
         } else {
             Ok(AccountLockState::Inconsistent {
                 delegated_id: *pubkey,
-                buffer_pda,
                 delegation_pda,
                 inconsistencies,
             })
-        }
-    }
-
-    async fn verify_buffer_account(
-        &self,
-        buffer_pda: &Pubkey,
-    ) -> LockboxResult<Option<Vec<LockInconsistency>>> {
-        let buffer_account =
-            match self.account_provider.get_account(buffer_pda).await? {
-                None => {
-                    return Ok(Some(vec![
-                        LockInconsistency::BufferAccountNotFound,
-                    ]))
-                }
-                Some(acc) => acc,
-            };
-
-        if !is_owned_by_delegation_program(&buffer_account) {
-            Ok(Some(vec![LockInconsistency::BufferAccountInvalidOwner]))
-        } else {
-            Ok(None)
         }
     }
 

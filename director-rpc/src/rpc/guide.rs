@@ -1,7 +1,6 @@
 use conjunto_transwise::trans_account_meta::Endpoint;
 use jsonrpsee::{
-    core::RpcResult,
-    core::{client::ClientT, RegisterMethodError},
+    core::{client::ClientT, RegisterMethodError, RpcResult},
     RpcModule,
 };
 use log::*;

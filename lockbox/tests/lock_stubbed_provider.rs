@@ -22,10 +22,9 @@ fn setup(
 
 #[tokio::test]
 async fn test_delegate_properly_locked() {
-    let (delegated_id, buffer_pda, delegation_pda) = delegated_account_ids();
+    let (delegated_id, delegation_pda) = delegated_account_ids();
     let lockstate_provider = setup(vec![
         (delegated_id, account_owned_by_delegation_program()),
-        (buffer_pda, account_owned_by_delegation_program()),
         (delegation_pda, account_owned_by_delegation_program()),
     ]);
 
@@ -38,7 +37,6 @@ async fn test_delegate_properly_locked() {
         state,
         AccountLockState::Locked {
             delegated_id,
-            buffer_pda,
             delegation_pda
         }
     );
@@ -46,11 +44,10 @@ async fn test_delegate_properly_locked() {
 
 #[tokio::test]
 async fn test_delegate_unlocked() {
-    let (delegated_id, buffer_pda, delegation_pda) = delegated_account_ids();
+    let (delegated_id, delegation_pda) = delegated_account_ids();
     let lockstate_provider = setup(vec![
         (delegated_id, account_owned_by_system_program()),
         // The other accounts don't matter since we don't check them if no lock is present
-        (buffer_pda, account_owned_by_delegation_program()),
         (delegation_pda, account_owned_by_delegation_program()),
     ]);
 
@@ -64,11 +61,10 @@ async fn test_delegate_unlocked() {
 
 #[tokio::test]
 async fn test_delegate_not_found() {
-    let (delegated_id, buffer_pda, delegation_pda) = delegated_account_ids();
+    let (delegated_id, delegation_pda) = delegated_account_ids();
     let lockstate_provider = setup(vec![
         // The other accounts don't matter since we don't check them if delegated
         // account is missing
-        (buffer_pda, account_owned_by_delegation_program()),
         (delegation_pda, account_owned_by_delegation_program()),
     ]);
 
@@ -81,58 +77,8 @@ async fn test_delegate_not_found() {
 }
 
 #[tokio::test]
-async fn test_delegate_missing_buffer_account() {
-    let (delegated_id, buffer_pda, delegation_pda) = delegated_account_ids();
-
-    let lockstate_provider = setup(vec![
-        (delegated_id, account_owned_by_delegation_program()),
-        (delegation_pda, account_owned_by_delegation_program()),
-    ]);
-
-    let state = lockstate_provider
-        .try_lockstate_of_pubkey(&delegated_id)
-        .await
-        .unwrap();
-
-    assert_eq!(
-        state,
-        AccountLockState::Inconsistent {
-            delegated_id,
-            buffer_pda,
-            delegation_pda,
-            inconsistencies: vec![LockInconsistency::BufferAccountNotFound]
-        }
-    );
-}
-
-#[tokio::test]
 async fn test_delegate_missing_delegate_account() {
-    let (delegated_id, buffer_pda, delegation_pda) = delegated_account_ids();
-
-    let lockstate_provider = setup(vec![
-        (delegated_id, account_owned_by_delegation_program()),
-        (buffer_pda, account_owned_by_delegation_program()),
-    ]);
-
-    let state = lockstate_provider
-        .try_lockstate_of_pubkey(&delegated_id)
-        .await
-        .unwrap();
-
-    assert_eq!(
-        state,
-        AccountLockState::Inconsistent {
-            delegated_id,
-            buffer_pda,
-            delegation_pda,
-            inconsistencies: vec![LockInconsistency::DelegationAccountNotFound]
-        }
-    );
-}
-
-#[tokio::test]
-async fn test_delegate_missing_buffer_and_delegation_accounts() {
-    let (delegated_id, buffer_pda, delegation_pda) = delegated_account_ids();
+    let (delegated_id, delegation_pda) = delegated_account_ids();
 
     let lockstate_provider =
         setup(vec![(delegated_id, account_owned_by_delegation_program())]);
@@ -146,72 +92,15 @@ async fn test_delegate_missing_buffer_and_delegation_accounts() {
         state,
         AccountLockState::Inconsistent {
             delegated_id,
-            buffer_pda,
             delegation_pda,
-            inconsistencies: vec![
-                LockInconsistency::BufferAccountNotFound,
-                LockInconsistency::DelegationAccountNotFound
-            ]
-        }
-    );
-}
-
-#[tokio::test]
-async fn test_delegate_buffer_not_owned_by_delegate_program() {
-    let (delegated_id, buffer_pda, delegation_pda) = delegated_account_ids();
-    let lockstate_provider = setup(vec![
-        (delegated_id, account_owned_by_delegation_program()),
-        (buffer_pda, account_owned_by_system_program()),
-        (delegation_pda, account_owned_by_delegation_program()),
-    ]);
-
-    let state = lockstate_provider
-        .try_lockstate_of_pubkey(&delegated_id)
-        .await
-        .unwrap();
-
-    assert_eq!(
-        state,
-        AccountLockState::Inconsistent {
-            delegated_id,
-            buffer_pda,
-            delegation_pda,
-            inconsistencies: vec![LockInconsistency::BufferAccountInvalidOwner]
+            inconsistencies: vec![LockInconsistency::DelegationAccountNotFound]
         }
     );
 }
 
 #[tokio::test]
 async fn test_delegate_delegation_not_owned_by_delegate_program() {
-    let (delegated_id, buffer_pda, delegation_pda) = delegated_account_ids();
-    let lockstate_provider = setup(vec![
-        (delegated_id, account_owned_by_delegation_program()),
-        (buffer_pda, account_owned_by_delegation_program()),
-        (delegation_pda, account_owned_by_system_program()),
-    ]);
-
-    let state = lockstate_provider
-        .try_lockstate_of_pubkey(&delegated_id)
-        .await
-        .unwrap();
-
-    assert_eq!(
-        state,
-        AccountLockState::Inconsistent {
-            delegated_id,
-            buffer_pda,
-            delegation_pda,
-            inconsistencies: vec![
-                LockInconsistency::DelegationAccountInvalidOwner
-            ]
-        }
-    );
-}
-
-#[tokio::test]
-async fn test_delegate_buffer_missing_and_delegation_not_owned_by_delegate_program(
-) {
-    let (delegated_id, buffer_pda, delegation_pda) = delegated_account_ids();
+    let (delegated_id, delegation_pda) = delegated_account_ids();
     let lockstate_provider = setup(vec![
         (delegated_id, account_owned_by_delegation_program()),
         (delegation_pda, account_owned_by_system_program()),
@@ -226,10 +115,8 @@ async fn test_delegate_buffer_missing_and_delegation_not_owned_by_delegate_progr
         state,
         AccountLockState::Inconsistent {
             delegated_id,
-            buffer_pda,
             delegation_pda,
             inconsistencies: vec![
-                LockInconsistency::BufferAccountNotFound,
                 LockInconsistency::DelegationAccountInvalidOwner
             ]
         }

@@ -1,10 +1,10 @@
-use conjunto_core::{AccountProvider, SignatureStatusProvider};
-use futures_util::stream::SplitSink;
-use log::*;
 use std::sync::Arc;
 
+use conjunto_core::{AccountProvider, SignatureStatusProvider};
 use director::{DirectorPubsub, DirectorPubsubConfig};
 use errors::DirectorPubsubResult;
+use futures_util::stream::SplitSink;
+use log::*;
 use tokio::{
     net::{TcpListener, TcpStream},
     task::JoinHandle,

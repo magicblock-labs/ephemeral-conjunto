@@ -22,10 +22,9 @@ fn setup_lockstate_provider(
 
 #[tokio::test]
 async fn test_account_meta_one_properly_locked_writable_and_one_readonly() {
-    let (delegated_id, buffer_pda, delegation_pda) = delegated_account_ids();
+    let (delegated_id, delegation_pda) = delegated_account_ids();
     let lockstate_provider = setup_lockstate_provider(vec![
         (delegated_id, account_owned_by_delegation_program()),
-        (buffer_pda, account_owned_by_delegation_program()),
         (delegation_pda, account_owned_by_delegation_program()),
     ]);
     let readonly_id = Pubkey::new_from_array([4u8; 32]);
@@ -50,11 +49,10 @@ async fn test_account_meta_one_properly_locked_writable_and_one_readonly() {
 #[tokio::test]
 async fn test_account_meta_one_properly_locked_writable_and_one_unlocked_writable(
 ) {
-    let (delegated_id, buffer_pda, delegation_pda) = delegated_account_ids();
+    let (delegated_id, delegation_pda) = delegated_account_ids();
     let writable_id = Pubkey::new_from_array([4u8; 32]);
     let lockstate_provider = setup_lockstate_provider(vec![
         (delegated_id, account_owned_by_delegation_program()),
-        (buffer_pda, account_owned_by_delegation_program()),
         (delegation_pda, account_owned_by_delegation_program()),
         (writable_id, account_owned_by_system_program()),
     ]);
@@ -78,10 +76,9 @@ async fn test_account_meta_one_properly_locked_writable_and_one_unlocked_writabl
 
 #[tokio::test]
 async fn test_account_meta_one_improperly_locked_writable_and_one_readonly() {
-    let (delegated_id, buffer_pda, _) = delegated_account_ids();
+    let (delegated_id, _) = delegated_account_ids();
     let lockstate_provider = setup_lockstate_provider(vec![
         (delegated_id, account_owned_by_delegation_program()),
-        (buffer_pda, account_owned_by_delegation_program()),
         // Missing delegation account
     ]);
     let readonly_id = Pubkey::new_from_array([4u8; 32]);
@@ -105,10 +102,9 @@ async fn test_account_meta_one_improperly_locked_writable_and_one_readonly() {
 
 #[tokio::test]
 async fn test_account_meta_one_properly_locked_writable_and_one_new_writable() {
-    let (delegated_id, buffer_pda, delegation_pda) = delegated_account_ids();
+    let (delegated_id, delegation_pda) = delegated_account_ids();
     let lockstate_provider = setup_lockstate_provider(vec![
         (delegated_id, account_owned_by_delegation_program()),
-        (buffer_pda, account_owned_by_delegation_program()),
         (delegation_pda, account_owned_by_delegation_program()),
     ]);
     let new_writable_id = Pubkey::new_from_array([4u8; 32]);

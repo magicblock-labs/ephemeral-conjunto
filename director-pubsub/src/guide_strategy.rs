@@ -1,7 +1,8 @@
-use crate::messages::ParsedClientMessage;
 use conjunto_core::GuideStrategy;
 use log::*;
 use solana_rpc_client_api::config::RpcTransactionLogsFilter;
+
+use crate::messages::ParsedClientMessage;
 
 pub fn guide_strategy_from_pubsub_msg(msg: &str) -> GuideStrategy {
     let parsed = match ParsedClientMessage::try_from(msg) {

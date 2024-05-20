@@ -6,11 +6,10 @@ use jsonrpsee::{
     RpcModule,
 };
 
-use crate::errors::DirectorRpcResult;
-
 use self::{
     guide::register_guide_methods, passthrough::register_passthrough_methods,
 };
+use crate::errors::DirectorRpcResult;
 
 pub mod guide;
 mod params;

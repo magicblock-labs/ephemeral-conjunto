@@ -26,15 +26,12 @@ pub fn account_owned_by_system_program() -> Account {
     }
 }
 
-pub fn delegated_account_ids() -> (Pubkey, Pubkey, Pubkey) {
+pub fn delegated_account_ids() -> (Pubkey, Pubkey) {
     let delegated_addr = "8k2V7EzQtNg38Gi9HK5ZtQYp1YpGKNGrMcuGa737gZX4";
     let delegated_id = Pubkey::from_str(delegated_addr).unwrap();
-
-    let buffer_addr = "E8NdkAGLLC3qnvphsXhqkjkXpRkdoiDpicSTTQJySVtG";
-    let buffer_pda = Pubkey::from_str(buffer_addr).unwrap();
 
     let delegation_addr = "CkieZJmrj6dLhwteG69LSutpWwRHiDJY9S8ua7xJ7CRW";
     let delegation_pda = Pubkey::from_str(delegation_addr).unwrap();
 
-    (delegated_id, buffer_pda, delegation_pda)
+    (delegated_id, delegation_pda)
 }

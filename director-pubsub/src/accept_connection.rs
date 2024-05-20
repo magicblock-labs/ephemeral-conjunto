@@ -1,9 +1,5 @@
 use std::sync::Arc;
 
-use crate::{
-    director::DirectorPubsub, errors::DirectorPubsubResult, BackendWebSocket,
-    BackendWebSocketWriter,
-};
 use conjunto_core::{
     AccountProvider, RequestEndpoint, SignatureStatusProvider,
 };
@@ -11,6 +7,11 @@ use futures_util::{SinkExt, StreamExt};
 use log::*;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::Message;
+
+use crate::{
+    director::DirectorPubsub, errors::DirectorPubsubResult, BackendWebSocket,
+    BackendWebSocketWriter,
+};
 
 pub(crate) async fn accept_connection<
     T: AccountProvider,

@@ -1,6 +1,6 @@
 use paste::paste;
 
-use crate::consts::{BUFFER, COMMIT_RECORD, DELEGATION, STATE_DIFF};
+use crate::consts::{COMMIT_RECORD, DELEGATION, STATE_DIFF};
 
 // -----------------
 // Seeds
@@ -68,9 +68,6 @@ macro_rules! pda {
 seeds! { delegation, DELEGATION }
 pda! { delegation }
 
-seeds! { buffer, BUFFER }
-pda! { buffer }
-
 seeds! { state_diff, STATE_DIFF }
 pda! { state_diff }
 
@@ -85,7 +82,7 @@ mod tests {
 
     use super::*;
     use crate::consts::{
-        BUFFER, COMMIT_RECORD, DELEGATION, DELEGATION_PROGRAM_ID, STATE_DIFF,
+        COMMIT_RECORD, DELEGATION, DELEGATION_PROGRAM_ID, STATE_DIFF,
     };
 
     // -----------------
@@ -119,39 +116,6 @@ mod tests {
         let bump = [4];
         let seeds = delegation_seeds_with_bump_from_pubkey(&id, &bump);
         assert_eq!(seeds, [DELEGATION, id.as_ref(), &bump]);
-    }
-
-    // -----------------
-    // Buffer Seeds
-    // -----------------
-    #[test]
-    fn test_buffer_seeds() {
-        let id = [1, 2, 3];
-        let seeds = buffer_seeds(&id);
-        assert_eq!(seeds, [BUFFER, &id]);
-    }
-
-    #[test]
-    fn test_buffer_seeds_with_bump() {
-        let id = [1, 2, 3];
-        let bump = [4];
-        let seeds = buffer_seeds_with_bump(&id, &bump);
-        assert_eq!(seeds, [BUFFER, &id, &bump]);
-    }
-
-    #[test]
-    fn test_buffer_seeds_from_pubkey() {
-        let id = Pubkey::new_unique();
-        let seeds = buffer_seeds_from_pubkey(&id);
-        assert_eq!(seeds, [BUFFER, id.as_ref()]);
-    }
-
-    #[test]
-    fn test_buffer_seeds_with_bump_from_pubkey() {
-        let id = Pubkey::new_unique();
-        let bump = [4];
-        let seeds = buffer_seeds_with_bump_from_pubkey(&id, &bump);
-        assert_eq!(seeds, [BUFFER, id.as_ref(), &bump]);
     }
 
     // -----------------
@@ -265,60 +229,12 @@ mod tests {
         assert_eq!(bump, expected.1);
     }
 
-    // -----------------
-    // Buffer PDA
-    // -----------------
-    #[test]
-    fn test_buffer_pda() {
-        let id = Pubkey::new_unique();
-        let pda = buffer_pda(id.as_ref());
-        let seeds = buffer_seeds(id.as_ref());
-        let expected =
-            Pubkey::find_program_address(&seeds, &DELEGATION_PROGRAM_ID).0;
-        assert_eq!(pda, expected);
-    }
-
-    #[test]
-    fn test_buffer_pda_with_bump() {
-        let id = Pubkey::new_unique();
-        let (pda, bump) = buffer_pda_with_bump(id.as_ref());
-        let seeds = buffer_seeds(id.as_ref());
-        let expected =
-            Pubkey::find_program_address(&seeds, &DELEGATION_PROGRAM_ID);
-        assert_eq!(pda, expected.0);
-        assert_eq!(bump, expected.1);
-    }
-
-    #[test]
-    fn test_buffer_pda_from_pubkey() {
-        let id = Pubkey::new_unique();
-        let pda = buffer_pda_from_pubkey(&id);
-        let seeds = buffer_seeds_from_pubkey(&id);
-        let expected =
-            Pubkey::find_program_address(&seeds, &DELEGATION_PROGRAM_ID).0;
-        assert_eq!(pda, expected);
-    }
-
-    #[test]
-    fn test_buffer_pda_with_bump_from_pubkey() {
-        let id = Pubkey::new_unique();
-        let (pda, bump) = buffer_pda_with_bump_from_pubkey(&id);
-        let seeds = buffer_seeds_from_pubkey(&id);
-        let expected =
-            Pubkey::find_program_address(&seeds, &DELEGATION_PROGRAM_ID);
-        assert_eq!(pda, expected.0);
-        assert_eq!(bump, expected.1);
-    }
-
     // NOTE: left out remaining checks since they all are implemented via the same macro
 
     #[test]
     fn test_known_delegation() {
         let delegated_addr = "8k2V7EzQtNg38Gi9HK5ZtQYp1YpGKNGrMcuGa737gZX4";
         let delegated_id = Pubkey::from_str(delegated_addr).unwrap();
-
-        let buffer_addr = "E8NdkAGLLC3qnvphsXhqkjkXpRkdoiDpicSTTQJySVtG";
-        let buffer_id = Pubkey::from_str(buffer_addr).unwrap();
 
         let delegation_addr = "CkieZJmrj6dLhwteG69LSutpWwRHiDJY9S8ua7xJ7CRW";
         let delegation_id = Pubkey::from_str(delegation_addr).unwrap();
@@ -329,12 +245,10 @@ mod tests {
         let commit_record_addr = "GiDjQqUKeKJwLH5kdbnCgFS2XPGAVjXo73JMoeVn3UZL";
         let commit_record_id = Pubkey::from_str(commit_record_addr).unwrap();
 
-        let buffer_pda = buffer_pda_from_pubkey(&delegated_id);
         let delegation_pda = delegation_pda_from_pubkey(&delegated_id);
         let state_diff_pda = state_diff_pda_from_pubkey(&delegated_id);
         let commit_record_pda = commit_record_pda_from_pubkey(&delegated_id);
 
-        assert_eq!(buffer_pda, buffer_id);
         assert_eq!(delegation_pda, delegation_id);
         assert_eq!(state_diff_pda, state_diff_id);
         assert_eq!(commit_record_pda, commit_record_id);
