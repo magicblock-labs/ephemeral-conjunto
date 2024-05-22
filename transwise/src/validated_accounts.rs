@@ -67,11 +67,10 @@ impl TryFrom<(&TransAccountMetas, &ValidateAccountsConfig)>
 mod tests {
     use conjunto_lockbox::AccountLockState;
 
+    use super::*;
     use crate::{
         errors::TranswiseResult, trans_account_meta::TransAccountMeta,
     };
-
-    use super::*;
 
     fn config_no_new_accounts() -> ValidateAccountsConfig {
         ValidateAccountsConfig {
@@ -89,6 +88,7 @@ mod tests {
         AccountLockState::Locked {
             delegated_id: Pubkey::new_unique(),
             delegation_pda: Pubkey::new_unique(),
+            config: Default::default(),
         }
     }
 

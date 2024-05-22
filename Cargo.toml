@@ -50,11 +50,12 @@ log = "0.4.21"
 paste = "1.0"
 serde = "1.0.201"
 serde_json = "1.0.117"
-solana-account-decoder = "1.18.12"
-solana-rpc-client = "1.18.12"
-solana-rpc-client-api = "1.18.12"
-solana-sdk = "1.18.12"
-solana-transaction-status = "1.18.12"
+solana-account-decoder = { git = "https://github.com/solana-labs/solana", rev = "30adda4a71", package = "solana-account-decoder", version = "1.19.0" }
+solana-rpc-client = { git = "https://github.com/solana-labs/solana", rev = "30adda4a71", package = "solana-rpc-client", version = "1.19.0" }
+solana-rpc-client-api = { git = "https://github.com/solana-labs/solana", rev = "30adda4a71", package = "solana-rpc-client-api", version = "1.19.0" }
+solana-sdk = { git = "https://github.com/solana-labs/solana", rev = "30adda4a71", package = "solana-sdk", version = "1.19.0" }
+solana-transaction-status = { git = "https://github.com/solana-labs/solana", rev = "30adda4a71", package = "solana-transaction-status", version = "1.19.0" }
+solana-zk-token-sdk = { git = "https://github.com/solana-labs/solana", rev = "30adda4a71", package = "solana-zk-token-sdk", version = "1.19.0" }
 tokio-tungstenite = { version = "0.21.0", features = ["native-tls"] }
 thiserror = "1.0.60"
 tokio = { version = "1.37.0", features = ["macros", "io-util"] }
@@ -63,3 +64,13 @@ tower = { version = "0.4.13" }
 # Needed for (not yet working CORS)
 tower-http = { version = "0.5.2", features = ["cors"] }
 url = "2.5.0"
+
+[patch.crates-io]
+# If you are developing downstream using non-crates-io solana-program (local or
+# forked repo, or from github rev, eg), duplicate the following patch statements
+# in your Cargo.toml. If you still hit duplicate-type errors with the patch
+# statements in place, run `cargo update -p solana-program` and/or `cargo update
+# -p solana-zk-token-sdk` to remove extraneous versions from your Cargo.lock
+# file.
+solana-program = { git = "https://github.com/solana-labs/solana", rev = "30adda4a71", package = "solana-program", version = "1.19.0" }
+solana-zk-token-sdk = { git = "https://github.com/solana-labs/solana", rev = "30adda4a71", package = "solana-zk-token-sdk", version = "1.19.0" }

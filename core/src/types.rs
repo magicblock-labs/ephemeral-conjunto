@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 // -----------------
 // GuideStrategy
 // -----------------
@@ -40,4 +42,26 @@ pub enum RequestEndpoint {
     Ephemeral,
     /// Forward to both chain and ephemeral
     Both,
+}
+
+// -----------------
+// DelegationRecord
+// -----------------
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub enum CommitFrequency {
+    /// Commit every time after n number of milliseconds passed.
+    Millis(u64),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DelegationRecord {
+    pub commit_frequency: CommitFrequency,
+}
+
+impl Default for DelegationRecord {
+    fn default() -> Self {
+        Self {
+            commit_frequency: CommitFrequency::Millis(60_000),
+        }
+    }
 }

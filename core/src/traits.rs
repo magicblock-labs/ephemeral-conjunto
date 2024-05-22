@@ -3,7 +3,7 @@ use solana_sdk::{
     account::Account, pubkey::Pubkey, signature::Signature, transaction,
 };
 
-use crate::errors::CoreResult;
+use crate::{errors::CoreResult, DelegationRecord};
 
 #[async_trait]
 pub trait AccountProvider:
@@ -30,4 +30,8 @@ pub trait SignatureStatusProvider:
         &self,
         signature: &Signature,
     ) -> CoreResult<Option<transaction::Result<()>>>;
+}
+
+pub trait DelegationRecordParser {
+    fn try_parse(&self, data: &[u8]) -> CoreResult<DelegationRecord>;
 }

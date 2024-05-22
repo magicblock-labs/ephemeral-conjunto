@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use conjunto_core::{AccountProvider, AccountsHolder};
+use conjunto_core::{AccountProvider, AccountsHolder, DelegationRecordParser};
 use conjunto_lockbox::{AccountLockState, AccountLockStateProvider};
 use serde::{Deserialize, Serialize};
 use solana_sdk::{
@@ -14,8 +14,8 @@ use crate::errors::TranswiseResult;
 // SanitizedTransactionAccountsHolder
 // -----------------
 pub struct TransactionAccountsHolder {
-    writable: Vec<Pubkey>,
-    readonly: Vec<Pubkey>,
+    pub writable: Vec<Pubkey>,
+    pub readonly: Vec<Pubkey>,
 }
 
 impl From<&SanitizedTransaction> for TransactionAccountsHolder {
@@ -72,7 +72,7 @@ impl AccountsHolder for TransactionAccountsHolder {
 // -----------------
 // TransAccountMeta
 // -----------------
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum TransAccountMeta {
     Writable {
         pubkey: Pubkey,
@@ -88,9 +88,9 @@ impl TransAccountMeta {
         TransAccountMeta::Readonly { pubkey }
     }
 
-    pub async fn try_writable<T: AccountProvider>(
+    pub async fn try_writable<T: AccountProvider, U: DelegationRecordParser>(
         pubkey: Pubkey,
-        lockbox: &AccountLockStateProvider<T>,
+        lockbox: &AccountLockStateProvider<T, U>,
     ) -> TranswiseResult<Self> {
         let lockstate = lockbox.try_lockstate_of_pubkey(&pubkey).await?;
         Ok(TransAccountMeta::Writable { pubkey, lockstate })
@@ -108,7 +108,7 @@ impl TransAccountMeta {
 // -----------------
 // Endpoint
 // -----------------
-#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum Endpoint {
     Chain(TransAccountMetas),
     Ephemeral(TransAccountMetas),
@@ -153,7 +153,7 @@ pub enum UnroutableReason {
 // -----------------
 // TransAccountMetas
 // -----------------
-#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct TransAccountMetas(pub Vec<TransAccountMeta>);
 
 impl Deref for TransAccountMetas {
@@ -165,25 +165,35 @@ impl Deref for TransAccountMetas {
 }
 
 impl TransAccountMetas {
-    pub async fn from_versioned_transaction<T: AccountProvider>(
+    pub async fn from_versioned_transaction<
+        T: AccountProvider,
+        U: DelegationRecordParser,
+    >(
         tx: &VersionedTransaction,
-        lockbox: &AccountLockStateProvider<T>,
+        lockbox: &AccountLockStateProvider<T, U>,
     ) -> TranswiseResult<Self> {
         let tx_accounts = TransactionAccountsHolder::from(tx);
         Self::from_accounts_holder(&tx_accounts, lockbox).await
     }
 
-    pub async fn from_sanitized_transaction<T: AccountProvider>(
+    pub async fn from_sanitized_transaction<
+        T: AccountProvider,
+        U: DelegationRecordParser,
+    >(
         tx: &SanitizedTransaction,
-        lockbox: &AccountLockStateProvider<T>,
+        lockbox: &AccountLockStateProvider<T, U>,
     ) -> TranswiseResult<Self> {
         let tx_accounts = TransactionAccountsHolder::from(tx);
         Self::from_accounts_holder(&tx_accounts, lockbox).await
     }
 
-    pub async fn from_accounts_holder<T: AccountProvider, U: AccountsHolder>(
+    pub async fn from_accounts_holder<
+        T: AccountProvider,
+        U: AccountsHolder,
+        V: DelegationRecordParser,
+    >(
         tx: &U,
-        lockbox: &AccountLockStateProvider<T>,
+        lockbox: &AccountLockStateProvider<T, V>,
     ) -> TranswiseResult<Self> {
         let mut account_metas = Vec::new();
         let readonly = tx.get_readonly();

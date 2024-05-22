@@ -8,6 +8,7 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
+async-trait = { workspace = true }
 conjunto-core = { workspace = true }
 conjunto-lockbox = { workspace = true }
 conjunto-providers = { workspace = true }
