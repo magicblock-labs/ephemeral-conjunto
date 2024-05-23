@@ -2,14 +2,35 @@ use solana_sdk::pubkey::Pubkey;
 
 use crate::{errors::TranswiseError, trans_account_meta::TransAccountMetas};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ValidateAccountsConfig {
     pub allow_new_accounts: bool,
+    pub require_delegation: bool,
+}
+
+impl Default for ValidateAccountsConfig {
+    fn default() -> Self {
+        Self {
+            allow_new_accounts: false,
+            require_delegation: true,
+        }
+    }
+}
+
+pub struct ValidatedReadonlyAccount {
+    pub pubkey: Pubkey,
+    pub is_program: Option<bool>,
 }
 
 pub struct ValidatedAccounts {
-    pub readonly: Vec<Pubkey>,
+    pub readonly: Vec<ValidatedReadonlyAccount>,
     pub writable: Vec<Pubkey>,
+}
+
+impl ValidatedAccounts {
+    pub fn readonly_pubkeys(&self) -> Vec<Pubkey> {
+        self.readonly.iter().map(|x| x.pubkey).collect()
+    }
 }
 
 impl TryFrom<(&TransAccountMetas, &ValidateAccountsConfig)>
@@ -21,7 +42,13 @@ impl TryFrom<(&TransAccountMetas, &ValidateAccountsConfig)>
         (meta, config): (&TransAccountMetas, &ValidateAccountsConfig),
     ) -> Result<Self, Self::Error> {
         let unlocked = meta.unlocked_writables();
-        if !unlocked.is_empty() {
+        // NOTE: when we don't require delegation then we still query the account states to
+        // get the lockstate of each writable. This causes some unnecessary overhead which we
+        // could avoid if we make the lockbox aware of this, i.e. by adding an LockstateUnknown
+        // variant and returning that instead of checking it.
+        // However this is only the case when developing locally and thus we may not optimize for
+        // it.
+        if config.require_delegation && !unlocked.is_empty() {
             return Err(TranswiseError::NotAllWritablesLocked {
                 locked: meta
                     .locked_writables()
@@ -58,7 +85,7 @@ impl TryFrom<(&TransAccountMetas, &ValidateAccountsConfig)>
         }
         Ok(ValidatedAccounts {
             readonly: meta.readable_pubkeys(),
-            writable: meta.writable_pubkeys(),
+            writable: meta.writable_pubkeys(!config.require_delegation),
         })
     }
 }
@@ -75,12 +102,14 @@ mod tests {
     fn config_no_new_accounts() -> ValidateAccountsConfig {
         ValidateAccountsConfig {
             allow_new_accounts: false,
+            require_delegation: true,
         }
     }
 
     fn config_allow_new_accounts() -> ValidateAccountsConfig {
         ValidateAccountsConfig {
             allow_new_accounts: true,
+            require_delegation: true,
         }
     }
 
@@ -93,7 +122,7 @@ mod tests {
     }
 
     fn unlocked() -> AccountLockState {
-        AccountLockState::Unlocked
+        AccountLockState::Unlocked { is_program: false }
     }
 
     fn new_account() -> AccountLockState {
@@ -114,8 +143,14 @@ mod tests {
         let readonly_id2 = Pubkey::new_unique();
         let writable_id = Pubkey::new_unique();
 
-        let meta1 = TransAccountMeta::readonly(readonly_id1);
-        let meta2 = TransAccountMeta::readonly(readonly_id2);
+        let meta1 = TransAccountMeta::Readonly {
+            pubkey: readonly_id1,
+            is_program: None,
+        };
+        let meta2 = TransAccountMeta::Readonly {
+            pubkey: readonly_id2,
+            is_program: None,
+        };
         let meta3 = TransAccountMeta::Writable {
             pubkey: writable_id,
             lockstate: locked(),
@@ -128,7 +163,7 @@ mod tests {
             .try_into()
             .unwrap();
 
-        assert_eq!(vas.readonly, vec![readonly_id1, readonly_id2]);
+        assert_eq!(vas.readonly_pubkeys(), vec![readonly_id1, readonly_id2]);
         assert_eq!(vas.writable, vec![writable_id]);
     }
 
@@ -137,7 +172,10 @@ mod tests {
         let readonly_id = Pubkey::new_unique();
         let writable_id = Pubkey::new_unique();
 
-        let meta1 = TransAccountMeta::readonly(readonly_id);
+        let meta1 = TransAccountMeta::Readonly {
+            pubkey: readonly_id,
+            is_program: None,
+        };
         let meta2 = TransAccountMeta::Writable {
             pubkey: writable_id,
             lockstate: unlocked(),
@@ -157,7 +195,10 @@ mod tests {
         let readonly_id = Pubkey::new_unique();
         let writable_id = Pubkey::new_unique();
 
-        let meta1 = TransAccountMeta::readonly(readonly_id);
+        let meta1 = TransAccountMeta::Readonly {
+            pubkey: readonly_id,
+            is_program: None,
+        };
         let meta2 = TransAccountMeta::Writable {
             pubkey: writable_id,
             lockstate: inconsistent(),
@@ -178,7 +219,10 @@ mod tests {
         let new_writable_id = Pubkey::new_unique();
         let locked_writable_id = Pubkey::new_unique();
 
-        let meta1 = TransAccountMeta::readonly(readonly_id1);
+        let meta1 = TransAccountMeta::Readonly {
+            pubkey: readonly_id1,
+            is_program: None,
+        };
         let meta2 = TransAccountMeta::Writable {
             pubkey: new_writable_id,
             lockstate: new_account(),
@@ -195,7 +239,7 @@ mod tests {
             .try_into()
             .unwrap();
 
-        assert_eq!(vas.readonly, vec![readonly_id1]);
+        assert_eq!(vas.readonly_pubkeys(), vec![readonly_id1]);
         assert_eq!(vas.writable, vec![locked_writable_id, new_writable_id]);
     }
 }

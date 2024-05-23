@@ -8,7 +8,9 @@ use solana_sdk::{
     transaction::{SanitizedTransaction, VersionedTransaction},
 };
 
-use crate::errors::TranswiseResult;
+use crate::{
+    errors::TranswiseResult, validated_accounts::ValidatedReadonlyAccount,
+};
 
 // -----------------
 // SanitizedTransactionAccountsHolder
@@ -78,14 +80,25 @@ pub enum TransAccountMeta {
         pubkey: Pubkey,
         lockstate: AccountLockState,
     },
+    /// Readable account.
+    /// If it was found on chain the [is_program] flag tells us if it was executable on chain.
+    /// If not found [is_program] is None.
     Readonly {
         pubkey: Pubkey,
+        is_program: Option<bool>,
     },
 }
 
 impl TransAccountMeta {
-    pub fn readonly(pubkey: Pubkey) -> Self {
-        TransAccountMeta::Readonly { pubkey }
+    pub async fn try_readonly<T: AccountProvider>(
+        pubkey: Pubkey,
+        account_provider: &T,
+    ) -> TranswiseResult<Self> {
+        let acc = account_provider.get_account(&pubkey).await?;
+        Ok(TransAccountMeta::Readonly {
+            pubkey,
+            is_program: acc.map(|x| x.executable),
+        })
     }
 
     pub async fn try_writable<T: AccountProvider, U: DelegationRecordParser>(
@@ -100,7 +113,7 @@ impl TransAccountMeta {
         use TransAccountMeta::*;
         match self {
             Writable { pubkey, .. } => pubkey,
-            Readonly { pubkey } => pubkey,
+            Readonly { pubkey, .. } => pubkey,
         }
     }
 }
@@ -192,14 +205,20 @@ impl TransAccountMetas {
         U: AccountsHolder,
         V: DelegationRecordParser,
     >(
-        tx: &U,
+        holder: &U,
         lockbox: &AccountLockStateProvider<T, V>,
     ) -> TranswiseResult<Self> {
         let mut account_metas = Vec::new();
-        let readonly = tx.get_readonly();
-        let writable = tx.get_writable();
+        let readonly = holder.get_readonly();
+        let writable = holder.get_writable();
         for pubkey in readonly.into_iter() {
-            account_metas.push(TransAccountMeta::readonly(pubkey));
+            account_metas.push(
+                TransAccountMeta::try_readonly(
+                    pubkey,
+                    lockbox.account_provider(),
+                )
+                .await?,
+            );
         }
         for pubkey in writable.into_iter() {
             let account_meta =
@@ -239,6 +258,9 @@ impl TransAccountMetas {
         match (has_locked_accounts, has_unlocked_accounts) {
             // If we write to both locked and unlocked accounts that exist on chain
             // then we cannot route it either to the chain or the ephemeral validator
+            // NOTE: this doens't consider the special case in which we allow cloning
+            // non-delegated writable accounts, however that should never be the case
+            // when the director determines an endpoint
             (true, true) => {
                 let locked_pubkeys = locked_writeables
                     .iter()
@@ -281,17 +303,63 @@ impl TransAccountMetas {
         }
     }
 
-    pub(crate) fn writable_pubkeys(&self) -> Vec<Pubkey> {
-        self.locked_writables()
+    pub fn writable_pubkeys(&self, include_unlocked: bool) -> Vec<Pubkey> {
+        let writables = self
+            .locked_writables()
             .iter()
             .chain(self.new_writables().iter())
+            .map(|x| *x.pubkey())
+            .collect::<Vec<_>>();
+        if include_unlocked {
+            writables
+                .into_iter()
+                .chain(self.unlocked_writables().iter().map(|x| *x.pubkey()))
+                .collect()
+        } else {
+            writables
+        }
+    }
+
+    pub fn readable_pubkeys(&self) -> Vec<ValidatedReadonlyAccount> {
+        self.iter()
+            .flat_map(|x| match x {
+                TransAccountMeta::Readonly { pubkey, is_program } => {
+                    Some(ValidatedReadonlyAccount {
+                        pubkey: *pubkey,
+                        is_program: *is_program,
+                    })
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn readable_non_program_pubkeys(&self) -> Vec<Pubkey> {
+        self.iter()
+            .filter(|x| {
+                matches!(
+                    x,
+                    TransAccountMeta::Readonly {
+                        is_program: Some(false),
+                        ..
+                    }
+                )
+            })
             .map(|x| *x.pubkey())
             .collect()
     }
 
-    pub(crate) fn readable_pubkeys(&self) -> Vec<Pubkey> {
+    pub fn readable_program_pubkeys(&self) -> Vec<Pubkey> {
         self.iter()
-            .filter(|x| matches!(x, TransAccountMeta::Readonly { .. }))
+            .filter(|x| {
+                matches!(
+                    x,
+                    TransAccountMeta::Readonly {
+                        is_program: Some(true),
+                        ..
+                    }
+                )
+            })
             .map(|x| *x.pubkey())
             .collect()
     }

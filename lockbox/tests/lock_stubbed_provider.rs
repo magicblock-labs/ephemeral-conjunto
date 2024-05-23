@@ -80,7 +80,7 @@ async fn test_delegate_unlocked() {
         .await
         .unwrap();
 
-    assert_eq!(state, AccountLockState::Unlocked);
+    assert!(matches!(state, AccountLockState::Unlocked { .. }));
 }
 
 #[tokio::test]

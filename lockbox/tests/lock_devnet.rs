@@ -67,5 +67,5 @@ async fn test_system_account_not_delegated() {
         .await
         .unwrap();
 
-    assert_eq!(state, AccountLockState::Unlocked);
+    assert!(matches!(state, AccountLockState::Unlocked { .. }));
 }

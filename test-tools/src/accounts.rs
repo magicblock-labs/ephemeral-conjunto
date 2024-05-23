@@ -26,6 +26,13 @@ pub fn account_owned_by_system_program() -> Account {
     }
 }
 
+pub fn program_account() -> Account {
+    Account {
+        executable: true,
+        ..Account::default()
+    }
+}
+
 pub fn delegated_account_ids() -> (Pubkey, Pubkey) {
     let delegated_addr = "8k2V7EzQtNg38Gi9HK5ZtQYp1YpGKNGrMcuGa737gZX4";
     let delegated_id = Pubkey::from_str(delegated_addr).unwrap();

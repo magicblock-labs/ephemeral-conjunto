@@ -4,7 +4,7 @@ use conjunto_test_tools::{
     account_provider_stub::AccountProviderStub,
     accounts::{
         account_owned_by_delegation_program, account_owned_by_system_program,
-        delegated_account_ids,
+        delegated_account_ids, program_account,
     },
     delegation_record_parser_stub::DelegationRecordParserStub,
     transaction_accounts_holder_stub::TransactionAccountsHolderStub,
@@ -247,4 +247,44 @@ async fn test_account_meta_two_readonlys() {
 
     eprintln!("{:#?}", endpoint);
     assert!(endpoint.is_unroutable());
+}
+
+#[tokio::test]
+async fn test_account_meta_two_readonlys_one_program_and_one_writable() {
+    let readonly1 = Pubkey::new_from_array([4u8; 32]);
+    let readonly2 = Pubkey::new_from_array([5u8; 32]);
+    let writable = Pubkey::new_from_array([6u8; 32]);
+    let lockstate_provider = setup_lockstate_provider(
+        vec![
+            (readonly1, account_owned_by_system_program()),
+            (readonly2, program_account()),
+        ],
+        Some(DelegationRecord::default()),
+    );
+
+    let acc_holder = TransactionAccountsHolderStub {
+        readonly: vec![readonly1, readonly2],
+        writable: vec![writable],
+    };
+
+    let endpoint = TransAccountMetas::from_accounts_holder(
+        &acc_holder,
+        &lockstate_provider,
+    )
+    .await
+    .unwrap()
+    .into_endpoint();
+    assert!(endpoint.is_ephemeral());
+
+    let transaction_metas = endpoint.into_account_metas();
+    assert_eq!(transaction_metas.len(), 3);
+    assert_eq!(
+        transaction_metas.readable_non_program_pubkeys(),
+        vec![readonly1]
+    );
+    assert_eq!(
+        transaction_metas.readable_program_pubkeys(),
+        vec![readonly2]
+    );
+    assert_eq!(transaction_metas.writable_pubkeys(false), vec![writable]);
 }

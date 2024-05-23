@@ -54,8 +54,10 @@ pub enum AccountLockState {
     /// that
     NewAccount,
     /// The account was found on chain and is not locked and therefore should
-    /// not be used as writable on the ephemeral validator
-    Unlocked,
+    /// not be used as writable on the ephemeral validator unless otherwise requested
+    /// via the `require_delegation` setting.
+    /// If the program was found to be executable it is marked as such via [is_program].
+    Unlocked { is_program: bool },
     /// The account was found on chain in a proper locked state which means we
     /// also found the related accounts like the buffer and delegation
     /// NOTE: commit records and state diff accountsk are not checked since an
@@ -85,7 +87,7 @@ impl AccountLockState {
     }
 
     pub fn is_unlocked(&self) -> bool {
-        matches!(self, AccountLockState::Unlocked)
+        matches!(self, AccountLockState::Unlocked { .. })
     }
 
     pub fn is_inconsistent(&self) -> bool {
@@ -166,7 +168,9 @@ impl<T: AccountProvider, U: DelegationRecordParser>
 
         // 2. Check that it is locked by the delegation program
         if !is_owned_by_delegation_program(&account) {
-            return Ok(AccountLockState::Unlocked);
+            return Ok(AccountLockState::Unlocked {
+                is_program: account.executable,
+            });
         }
 
         // 3. Verify the delegation account exists and is owned by the delegation program
@@ -191,5 +195,9 @@ impl<T: AccountProvider, U: DelegationRecordParser>
                 inconsistencies,
             }),
         }
+    }
+
+    pub fn account_provider(&self) -> &T {
+        &self.account_provider
     }
 }
