@@ -18,30 +18,43 @@ jobs:
     steps:
       - name: Checkout Conjunto
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: conjunto
+
+      - name: Checkout Delegation Program
+        uses: actions/checkout@v4
+        with:
+          repository: magicblock-labs/delegation-program
+          token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          path: delegation-program
 
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: 'conjunto-build_test_lint-cache-bust-000'
           workspaces: |
-            . -> target
+            conjunto -> target
           cache-targets: true
           cache-all-crates: true
           cache-on-failure: true
 
       - name: Prebuild Conjunto Target Size
-        run: du -h -d1 target || true
+        run: du -h -d1 conjunto/target || true
 
       - name: Cargo Build
         run: make ci-build
         shell: bash
+        working-directory: conjunto
 
       - name: Cargo Clippy Lint
         run: make ci-clippy
         shell: bash
+        working-directory: conjunto
 
       - name: Cargo Test
         run: make ci-test
         shell: bash
+        working-directory: conjunto
 
-      - name: List Conjunto Target Size
-        run: du -h -d1 target
+      - name: Postbuild Conjunto Target Size
+        run: du -h -d1 conjunto/target

@@ -22,14 +22,26 @@ pub struct ValidatedReadonlyAccount {
     pub is_program: Option<bool>,
 }
 
+pub struct ValidatedWritableAccount {
+    pub pubkey: Pubkey,
+    /// The current owner of delegated/locked accounts is the delegation
+    /// program.
+    /// Here we include the original owner of the account before delegation.
+    /// This info is provided via the delegation record.
+    pub owner: Option<Pubkey>,
+}
+
 pub struct ValidatedAccounts {
     pub readonly: Vec<ValidatedReadonlyAccount>,
-    pub writable: Vec<Pubkey>,
+    pub writable: Vec<ValidatedWritableAccount>,
 }
 
 impl ValidatedAccounts {
     pub fn readonly_pubkeys(&self) -> Vec<Pubkey> {
         self.readonly.iter().map(|x| x.pubkey).collect()
+    }
+    pub fn writable_pubkeys(&self) -> Vec<Pubkey> {
+        self.writable.iter().map(|x| x.pubkey).collect()
     }
 }
 
@@ -53,12 +65,12 @@ impl TryFrom<(&TransAccountMetas, &ValidateAccountsConfig)>
                 locked: meta
                     .locked_writables()
                     .into_iter()
-                    .map(|x| *x.pubkey())
+                    .map(|x| x.pubkey)
                     .collect(),
                 unlocked: meta
                     .unlocked_writables()
                     .into_iter()
-                    .map(|x| *x.pubkey())
+                    .map(|x| x.pubkey)
                     .collect(),
             });
         }
@@ -79,20 +91,21 @@ impl TryFrom<(&TransAccountMetas, &ValidateAccountsConfig)>
                 new_accounts: meta
                     .new_writables()
                     .into_iter()
-                    .map(|x| *x.pubkey())
+                    .map(|x| x.pubkey)
                     .collect(),
             });
         }
         Ok(ValidatedAccounts {
-            readonly: meta.readable_pubkeys(),
-            writable: meta.writable_pubkeys(!config.require_delegation),
+            readonly: meta.readonly_accounts(),
+            writable: meta.writable_accounts(!config.require_delegation),
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use conjunto_lockbox::AccountLockState;
+    use conjunto_core::CommitFrequency;
+    use conjunto_lockbox::{AccountLockState, LockConfig};
 
     use super::*;
     use crate::{
@@ -117,7 +130,10 @@ mod tests {
         AccountLockState::Locked {
             delegated_id: Pubkey::new_unique(),
             delegation_pda: Pubkey::new_unique(),
-            config: Default::default(),
+            config: LockConfig {
+                commit_frequency: CommitFrequency::Millis(1_000),
+                owner: Pubkey::new_unique(),
+            },
         }
     }
 
@@ -164,7 +180,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(vas.readonly_pubkeys(), vec![readonly_id1, readonly_id2]);
-        assert_eq!(vas.writable, vec![writable_id]);
+        assert_eq!(vas.writable_pubkeys(), vec![writable_id]);
     }
 
     #[test]
@@ -240,6 +256,9 @@ mod tests {
             .unwrap();
 
         assert_eq!(vas.readonly_pubkeys(), vec![readonly_id1]);
-        assert_eq!(vas.writable, vec![locked_writable_id, new_writable_id]);
+        assert_eq!(
+            vas.writable_pubkeys(),
+            vec![locked_writable_id, new_writable_id]
+        );
     }
 }

@@ -35,7 +35,7 @@ async fn test_account_meta_one_properly_locked_writable_and_one_readonly() {
             (delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
         ],
-        Some(DelegationRecord::default()),
+        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
     let readonly_id = Pubkey::new_from_array([4u8; 32]);
 
@@ -67,7 +67,7 @@ async fn test_account_meta_one_properly_locked_writable_and_one_unlocked_writabl
             (delegation_pda, account_owned_by_delegation_program()),
             (writable_id, account_owned_by_system_program()),
         ],
-        Some(DelegationRecord::default()),
+        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
 
     let acc_holder = TransactionAccountsHolderStub {
@@ -95,7 +95,7 @@ async fn test_account_meta_one_improperly_locked_writable_and_one_readonly() {
             (delegated_id, account_owned_by_delegation_program()),
             // Missing delegation account
         ],
-        Some(DelegationRecord::default()),
+        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
     let readonly_id = Pubkey::new_from_array([4u8; 32]);
 
@@ -154,7 +154,7 @@ async fn test_account_meta_one_properly_locked_writable_and_one_new_writable() {
             (delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
         ],
-        Some(DelegationRecord::default()),
+        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
     let new_writable_id = Pubkey::new_from_array([4u8; 32]);
 
@@ -177,8 +177,10 @@ async fn test_account_meta_one_properly_locked_writable_and_one_new_writable() {
 
 #[tokio::test]
 async fn test_account_meta_one_new_writable() {
-    let lockstate_provider =
-        setup_lockstate_provider(vec![], Some(DelegationRecord::default()));
+    let lockstate_provider = setup_lockstate_provider(
+        vec![],
+        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
+    );
     let new_writable_id = Pubkey::new_from_array([4u8; 32]);
 
     let acc_holder = TransactionAccountsHolderStub {
@@ -203,7 +205,7 @@ async fn test_account_meta_one_unlocked_writable_two_readonlys() {
     let unlocked_writable_id = Pubkey::new_from_array([4u8; 32]);
     let lockstate_provider = setup_lockstate_provider(
         vec![(unlocked_writable_id, account_owned_by_system_program())],
-        Some(DelegationRecord::default()),
+        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
     let readonly1 = Pubkey::new_from_array([4u8; 32]);
     let readonly2 = Pubkey::new_from_array([5u8; 32]);
@@ -227,8 +229,10 @@ async fn test_account_meta_one_unlocked_writable_two_readonlys() {
 
 #[tokio::test]
 async fn test_account_meta_two_readonlys() {
-    let lockstate_provider =
-        setup_lockstate_provider(vec![], Some(DelegationRecord::default()));
+    let lockstate_provider = setup_lockstate_provider(
+        vec![],
+        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
+    );
     let readonly1 = Pubkey::new_from_array([4u8; 32]);
     let readonly2 = Pubkey::new_from_array([5u8; 32]);
 
@@ -259,7 +263,7 @@ async fn test_account_meta_two_readonlys_one_program_and_one_writable() {
             (readonly1, account_owned_by_system_program()),
             (readonly2, program_account()),
         ],
-        Some(DelegationRecord::default()),
+        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
 
     let acc_holder = TransactionAccountsHolderStub {
@@ -279,12 +283,19 @@ async fn test_account_meta_two_readonlys_one_program_and_one_writable() {
     let transaction_metas = endpoint.into_account_metas();
     assert_eq!(transaction_metas.len(), 3);
     assert_eq!(
-        transaction_metas.readable_non_program_pubkeys(),
+        transaction_metas.readonly_non_program_pubkeys(),
         vec![readonly1]
     );
     assert_eq!(
-        transaction_metas.readable_program_pubkeys(),
+        transaction_metas.readonly_program_pubkeys(),
         vec![readonly2]
     );
-    assert_eq!(transaction_metas.writable_pubkeys(false), vec![writable]);
+    assert_eq!(
+        transaction_metas
+            .writable_accounts(false)
+            .into_iter()
+            .map(|x| x.pubkey)
+            .collect::<Vec<_>>(),
+        vec![writable]
+    );
 }

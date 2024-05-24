@@ -18,20 +18,15 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct LockConfig {
     pub commit_frequency: CommitFrequency,
-}
-
-impl Default for LockConfig {
-    fn default() -> Self {
-        Self {
-            commit_frequency: CommitFrequency::Millis(60_000),
-        }
-    }
+    /// The original owner of the account
+    pub owner: Pubkey,
 }
 
 impl From<DelegationRecord> for LockConfig {
     fn from(record: DelegationRecord) -> Self {
         Self {
             commit_frequency: record.commit_frequency,
+            owner: record.owner,
         }
     }
 }
@@ -182,13 +177,17 @@ impl<T: AccountProvider, U: DelegationRecordParser>
         )
         .await?
         {
-            Valid(DelegationRecord { commit_frequency }) => {
-                Ok(AccountLockState::Locked {
-                    delegated_id: *pubkey,
-                    delegation_pda,
-                    config: LockConfig { commit_frequency },
-                })
-            }
+            Valid(DelegationRecord {
+                commit_frequency,
+                owner,
+            }) => Ok(AccountLockState::Locked {
+                delegated_id: *pubkey,
+                delegation_pda,
+                config: LockConfig {
+                    commit_frequency,
+                    owner,
+                },
+            }),
             Invalid(inconsistencies) => Ok(AccountLockState::Inconsistent {
                 delegated_id: *pubkey,
                 delegation_pda,

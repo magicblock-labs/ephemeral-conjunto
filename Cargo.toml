@@ -31,6 +31,7 @@ edition = "2021"
 async-trait = "0.1.80"
 base64 = "0.22.1"
 bincode = "1.3.3"
+bytemuck = "1.16.0"
 bs58 = "0.5.1"
 conjunto-addresses = { path = "addresses" }
 conjunto-core = { path = "core" }
@@ -41,6 +42,7 @@ conjunto-guidepoint = { path = "guidepoint" }
 conjunto-providers = { path = "providers" }
 conjunto-test-tools = { path = "test-tools" }
 conjunto-transwise = { path = "transwise" }
+delegation-program = { path = "../delegation-program" }
 env_logger = "0.11.3"
 futures-util = "0.3.30"
 # Needed for (not yet working CORS)

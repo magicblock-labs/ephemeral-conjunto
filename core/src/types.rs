@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use solana_sdk::pubkey::Pubkey;
 
 // -----------------
 // GuideStrategy
@@ -55,13 +56,18 @@ pub enum CommitFrequency {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DelegationRecord {
+    /// The original owner of the account
+    pub owner: Pubkey,
+    /// The frequency at which to commit the account state of the ephemeral
+    /// validator to the chain.
     pub commit_frequency: CommitFrequency,
 }
 
-impl Default for DelegationRecord {
-    fn default() -> Self {
+impl DelegationRecord {
+    pub fn default_with_owner(owner: Pubkey) -> Self {
         Self {
-            commit_frequency: CommitFrequency::Millis(60_000),
+            owner,
+            commit_frequency: CommitFrequency::Millis(1_000),
         }
     }
 }

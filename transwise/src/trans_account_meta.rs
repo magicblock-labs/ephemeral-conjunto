@@ -9,7 +9,8 @@ use solana_sdk::{
 };
 
 use crate::{
-    errors::TranswiseResult, validated_accounts::ValidatedReadonlyAccount,
+    errors::TranswiseResult,
+    validated_accounts::{ValidatedReadonlyAccount, ValidatedWritableAccount},
 };
 
 // -----------------
@@ -264,11 +265,11 @@ impl TransAccountMetas {
             (true, true) => {
                 let locked_pubkeys = locked_writeables
                     .iter()
-                    .map(|x| *x.pubkey())
+                    .map(|x| x.pubkey)
                     .collect::<Vec<Pubkey>>();
                 let unlocked_pubkeys = unlocked_writeables
                     .iter()
-                    .map(|x| *x.pubkey())
+                    .map(|x| x.pubkey)
                     .collect::<Vec<Pubkey>>();
                 Unroutable {
                     account_metas: self,
@@ -303,24 +304,26 @@ impl TransAccountMetas {
         }
     }
 
-    pub fn writable_pubkeys(&self, include_unlocked: bool) -> Vec<Pubkey> {
+    pub fn writable_accounts(
+        &self,
+        include_unlocked: bool,
+    ) -> Vec<ValidatedWritableAccount> {
         let writables = self
             .locked_writables()
-            .iter()
-            .chain(self.new_writables().iter())
-            .map(|x| *x.pubkey())
+            .into_iter()
+            .chain(self.new_writables())
             .collect::<Vec<_>>();
         if include_unlocked {
             writables
                 .into_iter()
-                .chain(self.unlocked_writables().iter().map(|x| *x.pubkey()))
+                .chain(self.unlocked_writables())
                 .collect()
         } else {
             writables
         }
     }
 
-    pub fn readable_pubkeys(&self) -> Vec<ValidatedReadonlyAccount> {
+    pub fn readonly_accounts(&self) -> Vec<ValidatedReadonlyAccount> {
         self.iter()
             .flat_map(|x| match x {
                 TransAccountMeta::Readonly { pubkey, is_program } => {
@@ -334,7 +337,7 @@ impl TransAccountMetas {
             .collect()
     }
 
-    pub fn readable_non_program_pubkeys(&self) -> Vec<Pubkey> {
+    pub fn readonly_non_program_pubkeys(&self) -> Vec<Pubkey> {
         self.iter()
             .filter(|x| {
                 matches!(
@@ -349,7 +352,7 @@ impl TransAccountMetas {
             .collect()
     }
 
-    pub fn readable_program_pubkeys(&self) -> Vec<Pubkey> {
+    pub fn readonly_program_pubkeys(&self) -> Vec<Pubkey> {
         self.iter()
             .filter(|x| {
                 matches!(
@@ -364,24 +367,50 @@ impl TransAccountMetas {
             .collect()
     }
 
-    pub(crate) fn locked_writables(&self) -> Vec<&TransAccountMeta> {
-        self
-            .iter()
-            .filter(|x| matches!(x, TransAccountMeta::Writable { lockstate, .. } if lockstate.is_locked()))
+    pub(crate) fn locked_writables(&self) -> Vec<ValidatedWritableAccount> {
+        self.iter()
+            .flat_map(|x| match x {
+                TransAccountMeta::Writable {
+                    lockstate: AccountLockState::Locked { config, .. },
+                    ..
+                } => Some(ValidatedWritableAccount {
+                    pubkey: *x.pubkey(),
+                    owner: Some(config.owner),
+                }),
+                _ => None,
+            })
             .collect()
     }
 
-    pub(crate) fn unlocked_writables(&self) -> Vec<&TransAccountMeta> {
-        self
-            .iter()
-            .filter(|x| matches!(x, TransAccountMeta::Writable { lockstate, .. } if lockstate.is_unlocked()))
+    pub(crate) fn unlocked_writables(&self) -> Vec<ValidatedWritableAccount> {
+        self.iter()
+            .flat_map(|x| match x {
+                TransAccountMeta::Writable { lockstate, .. }
+                    if lockstate.is_unlocked() =>
+                {
+                    Some(ValidatedWritableAccount {
+                        pubkey: *x.pubkey(),
+                        owner: None,
+                    })
+                }
+                _ => None,
+            })
             .collect()
     }
 
-    pub(crate) fn new_writables(&self) -> Vec<&TransAccountMeta> {
-        self
-            .iter()
-            .filter(|x| matches!(x, TransAccountMeta::Writable { lockstate, .. } if lockstate.is_new()))
+    pub(crate) fn new_writables(&self) -> Vec<ValidatedWritableAccount> {
+        self.iter()
+            .flat_map(|x| match x {
+                TransAccountMeta::Writable { lockstate, .. }
+                    if lockstate.is_new() =>
+                {
+                    Some(ValidatedWritableAccount {
+                        pubkey: *x.pubkey(),
+                        owner: None,
+                    })
+                }
+                _ => None,
+            })
             .collect()
     }
 

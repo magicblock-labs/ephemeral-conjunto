@@ -9,9 +9,11 @@ edition.workspace = true
 
 [dependencies]
 async-trait = { workspace = true }
+bytemuck = { workspace = true }
 conjunto-addresses = { workspace = true }
 conjunto-core = { workspace = true }
 conjunto-providers = { workspace = true }
+delegation-program = { workspace = true }
 serde = { workspace = true }
 solana-rpc-client = { workspace = true }
 solana-rpc-client-api = { workspace = true }
