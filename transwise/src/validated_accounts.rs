@@ -17,11 +17,13 @@ impl Default for ValidateAccountsConfig {
     }
 }
 
+#[derive(Debug)]
 pub struct ValidatedReadonlyAccount {
     pub pubkey: Pubkey,
     pub is_program: Option<bool>,
 }
 
+#[derive(Debug)]
 pub struct ValidatedWritableAccount {
     pub pubkey: Pubkey,
     /// The current owner of delegated/locked accounts is the delegation
@@ -29,8 +31,13 @@ pub struct ValidatedWritableAccount {
     /// Here we include the original owner of the account before delegation.
     /// This info is provided via the delegation record.
     pub owner: Option<Pubkey>,
+
+    /// Indicates if this account was a payer in the transaction from which
+    /// it was extracted.
+    pub is_payer: bool,
 }
 
+#[derive(Debug)]
 pub struct ValidatedAccounts {
     pub readonly: Vec<ValidatedReadonlyAccount>,
     pub writable: Vec<ValidatedWritableAccount>,
@@ -60,7 +67,10 @@ impl TryFrom<(&TransAccountMetas, &ValidateAccountsConfig)>
         // variant and returning that instead of checking it.
         // However this is only the case when developing locally and thus we may not optimize for
         // it.
-        if config.require_delegation && !unlocked.is_empty() {
+        // We also make an exception for payers of a transaction as those we don't require to be
+        // locked, but instead create and fund them.
+        let has_non_payer_unlocked = unlocked.iter().any(|x| !x.is_payer);
+        if config.require_delegation && has_non_payer_unlocked {
             return Err(TranswiseError::NotAllWritablesLocked {
                 locked: meta
                     .locked_writables()
@@ -170,6 +180,7 @@ mod tests {
         let meta3 = TransAccountMeta::Writable {
             pubkey: writable_id,
             lockstate: locked(),
+            is_payer: false,
         };
 
         let vas: ValidatedAccounts = (
@@ -195,6 +206,7 @@ mod tests {
         let meta2 = TransAccountMeta::Writable {
             pubkey: writable_id,
             lockstate: unlocked(),
+            is_payer: false,
         };
 
         let res: TranswiseResult<ValidatedAccounts> = (
@@ -204,6 +216,32 @@ mod tests {
             .try_into();
 
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_unlocked_writable_payer_one_readonly() {
+        let readonly_id = Pubkey::new_unique();
+        let writable_id = Pubkey::new_unique();
+
+        let meta1 = TransAccountMeta::Readonly {
+            pubkey: readonly_id,
+            is_program: None,
+        };
+        let meta2 = TransAccountMeta::Writable {
+            pubkey: writable_id,
+            lockstate: unlocked(),
+            is_payer: true,
+        };
+
+        let vas: ValidatedAccounts = (
+            &TransAccountMetas(vec![meta1, meta2]),
+            &config_no_new_accounts(),
+        )
+            .try_into()
+            .unwrap();
+
+        assert_eq!(vas.readonly_pubkeys(), vec![readonly_id]);
+        assert_eq!(vas.writable_pubkeys(), vec![writable_id]);
     }
 
     #[test]
@@ -218,6 +256,7 @@ mod tests {
         let meta2 = TransAccountMeta::Writable {
             pubkey: writable_id,
             lockstate: inconsistent(),
+            is_payer: false,
         };
 
         let res: TranswiseResult<ValidatedAccounts> = (
@@ -242,10 +281,12 @@ mod tests {
         let meta2 = TransAccountMeta::Writable {
             pubkey: new_writable_id,
             lockstate: new_account(),
+            is_payer: false,
         };
         let meta3 = TransAccountMeta::Writable {
             pubkey: locked_writable_id,
             lockstate: locked(),
+            is_payer: false,
         };
 
         let vas: ValidatedAccounts = (

@@ -20,6 +20,7 @@ pub trait AccountProvider:
 pub trait AccountsHolder {
     fn get_writable(&self) -> Vec<Pubkey>;
     fn get_readonly(&self) -> Vec<Pubkey>;
+    fn get_payer(&self) -> &Pubkey;
 }
 
 #[async_trait]

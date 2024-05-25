@@ -22,4 +22,7 @@ pub enum TranswiseError {
 
     #[error("Writables include new accounts")]
     WritablesIncludeNewAccounts { new_accounts: Vec<Pubkey> },
+
+    #[error("Transaction is missing payer account")]
+    TransactionIsMissingPayerAccount,
 }

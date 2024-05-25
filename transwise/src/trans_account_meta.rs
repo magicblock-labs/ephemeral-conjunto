@@ -9,7 +9,7 @@ use solana_sdk::{
 };
 
 use crate::{
-    errors::TranswiseResult,
+    errors::{TranswiseError, TranswiseResult},
     validated_accounts::{ValidatedReadonlyAccount, ValidatedWritableAccount},
 };
 
@@ -19,22 +19,38 @@ use crate::{
 pub struct TransactionAccountsHolder {
     pub writable: Vec<Pubkey>,
     pub readonly: Vec<Pubkey>,
+    pub payer: Pubkey,
 }
 
-impl From<&SanitizedTransaction> for TransactionAccountsHolder {
-    fn from(tx: &SanitizedTransaction) -> Self {
+impl TryFrom<&SanitizedTransaction> for TransactionAccountsHolder {
+    type Error = TranswiseError;
+
+    fn try_from(tx: &SanitizedTransaction) -> TranswiseResult<Self> {
         let loaded = tx.get_account_locks_unchecked();
         let writable = loaded.writable.iter().map(|x| **x).collect();
         let readonly = loaded.readonly.iter().map(|x| **x).collect();
-        Self { writable, readonly }
+        let payer = tx
+            .message()
+            .account_keys()
+            .get(0)
+            .ok_or(TranswiseError::TransactionIsMissingPayerAccount)?;
+        Ok(Self {
+            writable,
+            readonly,
+            payer: *payer,
+        })
     }
 }
 
-impl From<&VersionedTransaction> for TransactionAccountsHolder {
-    fn from(tx: &VersionedTransaction) -> Self {
+impl TryFrom<&VersionedTransaction> for TransactionAccountsHolder {
+    type Error = TranswiseError;
+    fn try_from(tx: &VersionedTransaction) -> TranswiseResult<Self> {
         let static_accounts = tx.message.static_account_keys();
         let mut writable = Vec::new();
         let mut readonly = Vec::new();
+        let payer = static_accounts
+            .first()
+            .ok_or(TranswiseError::TransactionIsMissingPayerAccount)?;
 
         for (idx, pubkey) in static_accounts.iter().enumerate() {
             if tx.message.is_maybe_writable(idx) {
@@ -59,7 +75,11 @@ impl From<&VersionedTransaction> for TransactionAccountsHolder {
             //    The latter would result in even more latency.
         }
 
-        Self { writable, readonly }
+        Ok(Self {
+            writable,
+            readonly,
+            payer: *payer,
+        })
     }
 }
 
@@ -69,6 +89,9 @@ impl AccountsHolder for TransactionAccountsHolder {
     }
     fn get_readonly(&self) -> Vec<Pubkey> {
         self.readonly.clone()
+    }
+    fn get_payer(&self) -> &Pubkey {
+        &self.payer
     }
 }
 
@@ -80,6 +103,7 @@ pub enum TransAccountMeta {
     Writable {
         pubkey: Pubkey,
         lockstate: AccountLockState,
+        is_payer: bool,
     },
     /// Readable account.
     /// If it was found on chain the [is_program] flag tells us if it was executable on chain.
@@ -105,9 +129,15 @@ impl TransAccountMeta {
     pub async fn try_writable<T: AccountProvider, U: DelegationRecordParser>(
         pubkey: Pubkey,
         lockbox: &AccountLockStateProvider<T, U>,
+        payer: &Pubkey,
     ) -> TranswiseResult<Self> {
         let lockstate = lockbox.try_lockstate_of_pubkey(&pubkey).await?;
-        Ok(TransAccountMeta::Writable { pubkey, lockstate })
+        let is_payer = pubkey == *payer;
+        Ok(TransAccountMeta::Writable {
+            pubkey,
+            lockstate,
+            is_payer,
+        })
     }
 
     pub fn pubkey(&self) -> &Pubkey {
@@ -116,6 +146,10 @@ impl TransAccountMeta {
             Writable { pubkey, .. } => pubkey,
             Readonly { pubkey, .. } => pubkey,
         }
+    }
+
+    pub fn is_payer(&self) -> bool {
+        matches!(self, TransAccountMeta::Writable { is_payer: true, .. })
     }
 }
 
@@ -160,6 +194,7 @@ pub enum UnroutableReason {
     BothLockedAndUnlocked {
         locked_writables: Vec<Pubkey>,
         unlocked_writables: Vec<Pubkey>,
+        unlocked_payers: Vec<Pubkey>,
     },
     NoWritableAccounts,
 }
@@ -186,7 +221,7 @@ impl TransAccountMetas {
         tx: &VersionedTransaction,
         lockbox: &AccountLockStateProvider<T, U>,
     ) -> TranswiseResult<Self> {
-        let tx_accounts = TransactionAccountsHolder::from(tx);
+        let tx_accounts = TransactionAccountsHolder::try_from(tx)?;
         Self::from_accounts_holder(&tx_accounts, lockbox).await
     }
 
@@ -197,7 +232,7 @@ impl TransAccountMetas {
         tx: &SanitizedTransaction,
         lockbox: &AccountLockStateProvider<T, U>,
     ) -> TranswiseResult<Self> {
-        let tx_accounts = TransactionAccountsHolder::from(tx);
+        let tx_accounts = TransactionAccountsHolder::try_from(tx)?;
         Self::from_accounts_holder(&tx_accounts, lockbox).await
     }
 
@@ -222,8 +257,12 @@ impl TransAccountMetas {
             );
         }
         for pubkey in writable.into_iter() {
-            let account_meta =
-                TransAccountMeta::try_writable(pubkey, lockbox).await?;
+            let account_meta = TransAccountMeta::try_writable(
+                pubkey,
+                lockbox,
+                holder.get_payer(),
+            )
+            .await?;
             account_metas.push(account_meta);
         }
 
@@ -254,9 +293,16 @@ impl TransAccountMetas {
         let unlocked_writeables = self.unlocked_writables();
 
         let has_locked_accounts = !locked_writeables.is_empty();
-        let has_unlocked_accounts = !unlocked_writeables.is_empty();
+        let (payer_unlocked_accounts, non_payer_unlocked_accounts) =
+            unlocked_writeables
+                .into_iter()
+                .partition::<Vec<_>, _>(|x| x.is_payer);
+        let has_non_payer_unlocked_accounts =
+            !non_payer_unlocked_accounts.is_empty();
 
-        match (has_locked_accounts, has_unlocked_accounts) {
+        let has_payer_unlocked_accounts = !payer_unlocked_accounts.is_empty();
+
+        match (has_locked_accounts, has_non_payer_unlocked_accounts) {
             // If we write to both locked and unlocked accounts that exist on chain
             // then we cannot route it either to the chain or the ephemeral validator
             // NOTE: this doens't consider the special case in which we allow cloning
@@ -267,7 +313,11 @@ impl TransAccountMetas {
                     .iter()
                     .map(|x| x.pubkey)
                     .collect::<Vec<Pubkey>>();
-                let unlocked_pubkeys = unlocked_writeables
+                let non_payer_unlocked_pubkeys = non_payer_unlocked_accounts
+                    .iter()
+                    .map(|x| x.pubkey)
+                    .collect::<Vec<Pubkey>>();
+                let payer_unlocked_pubkeys = payer_unlocked_accounts
                     .iter()
                     .map(|x| x.pubkey)
                     .collect::<Vec<Pubkey>>();
@@ -275,7 +325,8 @@ impl TransAccountMetas {
                     account_metas: self,
                     reason: BothLockedAndUnlocked {
                         locked_writables: locked_pubkeys,
-                        unlocked_writables: unlocked_pubkeys,
+                        unlocked_writables: non_payer_unlocked_pubkeys,
+                        unlocked_payers: payer_unlocked_pubkeys,
                     },
                 }
             }
@@ -283,6 +334,13 @@ impl TransAccountMetas {
             (true, false) => Ephemeral(self),
             // If all writables are unlocked we route to the chain
             (false, true) => Chain(self),
+            _ if has_payer_unlocked_accounts => {
+                // If we write to payer unlocked accounts we default to routing
+                // to the chain.
+                // See transwise/tests/account_meta.rs
+                // test_account_meta_one_unlocked_writable_that_is_payer for more info
+                Chain(self)
+            }
             // If we write to only new accounts we default to routing to the ephemeral
             // for now.
             // TODO(thlorenz): this edge case could be made configurable by having the user include
@@ -314,12 +372,17 @@ impl TransAccountMetas {
             .chain(self.new_writables())
             .collect::<Vec<_>>();
         if include_unlocked {
+            // Either we include all unlocked accounts
             writables
                 .into_iter()
                 .chain(self.unlocked_writables())
                 .collect()
         } else {
+            // Or only the ones that are also payers since we make a special case for them
             writables
+                .into_iter()
+                .chain(self.unlocked_writable_payers())
+                .collect()
         }
     }
 
@@ -367,6 +430,7 @@ impl TransAccountMetas {
             .collect()
     }
 
+    /// All locked writable accounts.
     pub(crate) fn locked_writables(&self) -> Vec<ValidatedWritableAccount> {
         self.iter()
             .flat_map(|x| match x {
@@ -375,6 +439,7 @@ impl TransAccountMetas {
                     ..
                 } => Some(ValidatedWritableAccount {
                     pubkey: *x.pubkey(),
+                    is_payer: x.is_payer(),
                     owner: Some(config.owner),
                 }),
                 _ => None,
@@ -382,6 +447,7 @@ impl TransAccountMetas {
             .collect()
     }
 
+    /// All unlocked writable accounts.
     pub(crate) fn unlocked_writables(&self) -> Vec<ValidatedWritableAccount> {
         self.iter()
             .flat_map(|x| match x {
@@ -390,6 +456,30 @@ impl TransAccountMetas {
                 {
                     Some(ValidatedWritableAccount {
                         pubkey: *x.pubkey(),
+                        is_payer: x.is_payer(),
+                        owner: None,
+                    })
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Unlocked writable accounts that are also payers of the transaction they
+    /// were extracted from.
+    pub(crate) fn unlocked_writable_payers(
+        &self,
+    ) -> Vec<ValidatedWritableAccount> {
+        self.iter()
+            .flat_map(|x| match x {
+                TransAccountMeta::Writable {
+                    lockstate,
+                    is_payer: true,
+                    ..
+                } if lockstate.is_unlocked() => {
+                    Some(ValidatedWritableAccount {
+                        pubkey: *x.pubkey(),
+                        is_payer: x.is_payer(),
                         owner: None,
                     })
                 }
@@ -406,6 +496,7 @@ impl TransAccountMetas {
                 {
                     Some(ValidatedWritableAccount {
                         pubkey: *x.pubkey(),
+                        is_payer: x.is_payer(),
                         owner: None,
                     })
                 }
