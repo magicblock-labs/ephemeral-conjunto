@@ -17,8 +17,12 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct LockConfig {
+    /// The frequency at which the account should be committed to chain
     pub commit_frequency: CommitFrequency,
-    /// The original owner of the account
+    /// The current owner of delegated/locked accounts is the delegation
+    /// program.
+    /// Here we include the original owner of the account before delegation.
+    /// This info is provided via the delegation record.
     pub owner: Pubkey,
 }
 

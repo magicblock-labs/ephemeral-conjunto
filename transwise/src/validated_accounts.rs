@@ -1,3 +1,4 @@
+pub use conjunto_lockbox::LockConfig;
 use solana_sdk::pubkey::Pubkey;
 
 use crate::{errors::TranswiseError, trans_account_meta::TransAccountMetas};
@@ -26,11 +27,10 @@ pub struct ValidatedReadonlyAccount {
 #[derive(Debug)]
 pub struct ValidatedWritableAccount {
     pub pubkey: Pubkey,
-    /// The current owner of delegated/locked accounts is the delegation
-    /// program.
-    /// Here we include the original owner of the account before delegation.
-    /// This info is provided via the delegation record.
-    pub owner: Option<Pubkey>,
+
+    /// The config for locked accounts.
+    /// This is `None` for unlocked writable accounts.
+    pub lock_config: Option<LockConfig>,
 
     /// Indicates if this account was a payer in the transaction from which
     /// it was extracted.

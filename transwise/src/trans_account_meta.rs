@@ -440,7 +440,7 @@ impl TransAccountMetas {
                 } => Some(ValidatedWritableAccount {
                     pubkey: *x.pubkey(),
                     is_payer: x.is_payer(),
-                    owner: Some(config.owner),
+                    lock_config: Some(config.clone()),
                 }),
                 _ => None,
             })
@@ -457,7 +457,7 @@ impl TransAccountMetas {
                     Some(ValidatedWritableAccount {
                         pubkey: *x.pubkey(),
                         is_payer: x.is_payer(),
-                        owner: None,
+                        lock_config: None,
                     })
                 }
                 _ => None,
@@ -480,7 +480,7 @@ impl TransAccountMetas {
                     Some(ValidatedWritableAccount {
                         pubkey: *x.pubkey(),
                         is_payer: x.is_payer(),
-                        owner: None,
+                        lock_config: None,
                     })
                 }
                 _ => None,
@@ -497,7 +497,7 @@ impl TransAccountMetas {
                     Some(ValidatedWritableAccount {
                         pubkey: *x.pubkey(),
                         is_payer: x.is_payer(),
-                        owner: None,
+                        lock_config: None,
                     })
                 }
                 _ => None,

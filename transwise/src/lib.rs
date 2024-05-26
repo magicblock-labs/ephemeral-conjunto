@@ -2,6 +2,7 @@ mod api;
 pub mod errors;
 pub mod trans_account_meta;
 pub mod validated_accounts;
+pub use conjunto_core::CommitFrequency;
 
 pub use api::{
     TransactionAccountsExtractor, Transwise, ValidatedAccountsProvider,
