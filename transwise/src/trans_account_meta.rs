@@ -16,6 +16,7 @@ use crate::{
 // -----------------
 // SanitizedTransactionAccountsHolder
 // -----------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TransactionAccountsHolder {
     pub writable: Vec<Pubkey>,
     pub readonly: Vec<Pubkey>,
@@ -441,6 +442,7 @@ impl TransAccountMetas {
                     pubkey: *x.pubkey(),
                     is_payer: x.is_payer(),
                     lock_config: Some(config.clone()),
+                    is_new: false,
                 }),
                 _ => None,
             })
@@ -458,6 +460,7 @@ impl TransAccountMetas {
                         pubkey: *x.pubkey(),
                         is_payer: x.is_payer(),
                         lock_config: None,
+                        is_new: false,
                     })
                 }
                 _ => None,
@@ -481,6 +484,7 @@ impl TransAccountMetas {
                         pubkey: *x.pubkey(),
                         is_payer: x.is_payer(),
                         lock_config: None,
+                        is_new: false,
                     })
                 }
                 _ => None,
@@ -498,6 +502,7 @@ impl TransAccountMetas {
                         pubkey: *x.pubkey(),
                         is_payer: x.is_payer(),
                         lock_config: None,
+                        is_new: true,
                     })
                 }
                 _ => None,

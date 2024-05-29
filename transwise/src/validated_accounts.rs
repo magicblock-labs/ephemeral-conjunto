@@ -35,6 +35,10 @@ pub struct ValidatedWritableAccount {
     /// Indicates if this account was a payer in the transaction from which
     /// it was extracted.
     pub is_payer: bool,
+
+    /// Indicates that this account was not found on chain but was included
+    /// since we allow new accounts to be created.
+    pub is_new: bool,
 }
 
 #[derive(Debug)]
