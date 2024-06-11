@@ -18,5 +18,4 @@ Implements logic to figure out the desired final endpoint for a given request's 
 
 *Important dependencies:*
 
-- Provides `AccountProvider`, `SignatureStatusProvider` and `RequestEndpoint`: [core](../core/README.md) 
-
+- Provides `AccountProvider`, `SignatureStatusProvider` and `RequestEndpoint`: [core](../core/README.md)

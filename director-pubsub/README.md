@@ -46,4 +46,4 @@ Any response from "chain" or "ephem" is sent directly back to the client
 *Important dependencies:*
 
 - Provides `GuideStrategyResolver`: [guidepoint](../guidepoint/README.md)
-- Provides `GuideStrategy` and `RequestEndpoint`: [core](../core/README.md) 
+- Provides `GuideStrategy` and `RequestEndpoint`: [core](../core/README.md)

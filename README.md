@@ -8,12 +8,12 @@ back and proxying.
 The director solves the following problem for all RPC requests that come in and solves it as
 follows:
 
-- it decides if this request is better served via the ephemeral validator or the chain one
-- to make those decisions it considers the accounts involved
-- i.e. for `sendTransaction` it makes sure that all writable accounts are either locked
-- if none of them are it sends to chain, if all of them are locked it sends to the ephemeral
-  validator
-- in the case of a mix it declares the request as _unroutable_
+- it decides if this request is better served via the ephemeral validator or the chain
+- to make those decisions it considers the accounts involved in the transaction
+- i.e. for `sendTransaction` it makes sure that:
+  - if none of them are delegated, transaction is sent to chain
+  - if all of them are delegated, transaction is sent to ephemeral
+  - in the case of a mix it declares the request as _unroutable_
 - other RPC methods need to be handled similarly, see `director-rpc/src/rpc/passthrough.rs`
 
 For Pubsub methods it solves this in a different way:

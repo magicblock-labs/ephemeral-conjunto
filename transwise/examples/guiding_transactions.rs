@@ -24,7 +24,7 @@ async fn main() {
     let from_kp = Keypair::new();
 
     let (delegated_id, _) = delegated_account_ids();
-    let unlocked_id =
+    let undelegated_id =
         Pubkey::from_str("soLXiij6o94fntzfvn2meNybhNfPBviTVuyXLVEtDJ3")
             .unwrap();
 
@@ -51,7 +51,7 @@ async fn main() {
     {
         let tx = system_transaction::transfer(
             &from_kp,
-            &unlocked_id,
+            &undelegated_id,
             42,
             Hash::default(),
         );
@@ -68,8 +68,11 @@ async fn main() {
     {
         let ix_delegated =
             system_instruction::transfer(&from_kp.pubkey(), &delegated_id, 42);
-        let ix_undelegated =
-            system_instruction::transfer(&from_kp.pubkey(), &unlocked_id, 42);
+        let ix_undelegated = system_instruction::transfer(
+            &from_kp.pubkey(),
+            &undelegated_id,
+            42,
+        );
         let tx = Transaction::new_signed_with_payer(
             &[ix_delegated, ix_undelegated],
             Some(&from_kp.pubkey()),

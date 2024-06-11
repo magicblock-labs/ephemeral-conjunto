@@ -38,7 +38,7 @@ fn setup(
 }
 
 #[tokio::test]
-async fn test_delegate_properly_locked() {
+async fn test_delegate_properly_delegated() {
     let (delegated_id, delegation_pda) = delegated_account_ids();
     let delegation_record = default_delegation_record();
     let lockstate_provider = setup(
@@ -56,7 +56,7 @@ async fn test_delegate_properly_locked() {
 
     assert_eq!(
         state,
-        AccountLockState::Locked {
+        AccountLockState::Delegated {
             delegated_id,
             delegation_pda,
             config: delegation_record.into(),
@@ -65,7 +65,7 @@ async fn test_delegate_properly_locked() {
 }
 
 #[tokio::test]
-async fn test_delegate_unlocked() {
+async fn test_delegate_undelegated() {
     let (delegated_id, delegation_pda) = delegated_account_ids();
     let lockstate_provider = setup(
         vec![
@@ -81,7 +81,7 @@ async fn test_delegate_unlocked() {
         .await
         .unwrap();
 
-    assert!(matches!(state, AccountLockState::Unlocked { .. }));
+    assert!(matches!(state, AccountLockState::Undelegated { .. }));
 }
 
 #[tokio::test]

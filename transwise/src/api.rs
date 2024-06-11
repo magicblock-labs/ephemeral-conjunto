@@ -7,43 +7,19 @@ use conjunto_providers::{
 use solana_sdk::transaction::{SanitizedTransaction, VersionedTransaction};
 
 use crate::{
+    endpoint::Endpoint,
     errors::TranswiseResult,
-    trans_account_meta::{
-        Endpoint, TransAccountMetas, TransactionAccountsHolder,
-    },
+    trans_account_meta::TransAccountMetas,
+    transaction_accounts_holder::TransactionAccountsHolder,
     validated_accounts::{ValidateAccountsConfig, ValidatedAccounts},
 };
 
 #[async_trait]
 pub trait ValidatedAccountsProvider {
-    /// Extracts information of all accounts involved in the transaction, validates
-    /// them and returns the result containing writable and readonly accounts.
-    /// The checks make sure that all writable accounts are either locked or conform
-    /// to what's specified in the config.
-    /// It is inefficent since it does not allow us to omit checks for some accounts.
-    /// Therefore the [Self::validate_accounts] method is preferred.
-    async fn validated_accounts_from_versioned_transaction(
-        &self,
-        tx: &VersionedTransaction,
-        config: &ValidateAccountsConfig,
-    ) -> TranswiseResult<ValidatedAccounts>;
-
-    /// Extracts information of all accounts involved in the transaction, validates
-    /// them and returns the result containing writable and readonly accounts.
-    /// The checks make sure that all writable accounts are either locked or conform
-    /// to what's specified in the config.
-    /// It is inefficent since it does not allow us to omit checks for some accounts.
-    /// Therefore the [Self::validate_accounts] method is preferred.
-    async fn validated_accounts_from_sanitized_transaction(
-        &self,
-        tx: &SanitizedTransaction,
-        config: &ValidateAccountsConfig,
-    ) -> TranswiseResult<ValidatedAccounts>;
-
     /// Extracts information of the provided accounts, validates
     /// them and returns the result containing writable and readonly accounts.
-    /// The checks make sure that all writable accounts are either locked or conform
-    /// to what's specified in the config.
+    /// The checks make sure that all writable accounts are either delegated
+    /// or conform to what's specified in the config.
     async fn validate_accounts(
         &self,
         transaction_accounts: &TransactionAccountsHolder,
@@ -136,10 +112,9 @@ impl Transwise {
         &self,
         tx: &VersionedTransaction,
     ) -> TranswiseResult<Endpoint> {
-        Ok(self
-            .account_metas_from_versioned_transaction(tx)
-            .await?
-            .into_endpoint())
+        Ok(Endpoint::from(
+            self.account_metas_from_versioned_transaction(tx).await?,
+        ))
     }
 
     /// Extracts information of all accounts involved in the transaction,
@@ -148,35 +123,14 @@ impl Transwise {
         &self,
         tx: &SanitizedTransaction,
     ) -> TranswiseResult<Endpoint> {
-        Ok(self
-            .account_metas_from_sanitized_transaction(tx)
-            .await?
-            .into_endpoint())
+        Ok(Endpoint::from(
+            self.account_metas_from_sanitized_transaction(tx).await?,
+        ))
     }
 }
 
 #[async_trait]
 impl ValidatedAccountsProvider for Transwise {
-    async fn validated_accounts_from_versioned_transaction(
-        &self,
-        tx: &VersionedTransaction,
-        config: &ValidateAccountsConfig,
-    ) -> TranswiseResult<ValidatedAccounts> {
-        let account_metas =
-            self.account_metas_from_versioned_transaction(tx).await?;
-        (&account_metas, config).try_into()
-    }
-
-    async fn validated_accounts_from_sanitized_transaction(
-        &self,
-        tx: &SanitizedTransaction,
-        config: &ValidateAccountsConfig,
-    ) -> TranswiseResult<ValidatedAccounts> {
-        let account_metas =
-            self.account_metas_from_sanitized_transaction(tx).await?;
-        (&account_metas, config).try_into()
-    }
-
     async fn validate_accounts(
         &self,
         transaction_accounts: &TransactionAccountsHolder,

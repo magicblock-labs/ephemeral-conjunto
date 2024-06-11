@@ -9,7 +9,9 @@ use conjunto_test_tools::{
     delegation_record_parser_stub::DelegationRecordParserStub,
     transaction_accounts_holder_stub::TransactionAccountsHolderStub,
 };
-use conjunto_transwise::trans_account_meta::TransAccountMetas;
+use conjunto_transwise::{
+    endpoint::Endpoint, trans_account_meta::TransAccountMetas,
+};
 use solana_sdk::{account::Account, pubkey::Pubkey};
 
 fn setup_lockstate_provider(
@@ -29,10 +31,10 @@ fn setup_lockstate_provider(
 
 #[tokio::test]
 async fn test_account_meta_one_properly_locked_writable_and_one_readonly() {
-    let (delegated_id, delegation_pda) = delegated_account_ids();
+    let (writable_delegated_id, delegation_pda) = delegated_account_ids();
     let lockstate_provider = setup_lockstate_provider(
         vec![
-            (delegated_id, account_owned_by_delegation_program()),
+            (writable_delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
         ],
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
@@ -41,7 +43,7 @@ async fn test_account_meta_one_properly_locked_writable_and_one_readonly() {
 
     let acc_holder = TransactionAccountsHolderStub {
         readonly: vec![readonly_id],
-        writable: vec![delegated_id],
+        writable: vec![writable_delegated_id],
         payer: Pubkey::new_unique(),
     };
 
@@ -51,29 +53,31 @@ async fn test_account_meta_one_properly_locked_writable_and_one_readonly() {
     )
     .await
     .unwrap();
-    let endpoint = account_metas.into_endpoint();
+
+    let endpoint = Endpoint::from(account_metas);
 
     eprintln!("{:#?}", endpoint);
     assert!(endpoint.is_ephemeral());
 }
 
 #[tokio::test]
-async fn test_account_meta_one_properly_locked_writable_and_one_unlocked_writable(
+async fn test_account_meta_one_properly_delegated_writable_and_one_writable_undelegated(
 ) {
-    let (delegated_id, delegation_pda) = delegated_account_ids();
-    let writable_id = Pubkey::new_from_array([4u8; 32]);
+    let (writable_delegated_id, delegation_pda) = delegated_account_ids();
+    let writable_undelegated_id = Pubkey::new_from_array([4u8; 32]);
     let lockstate_provider = setup_lockstate_provider(
         vec![
-            (delegated_id, account_owned_by_delegation_program()),
+            (writable_delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
-            (writable_id, account_owned_by_system_program()),
+            (writable_undelegated_id, account_owned_by_system_program()),
         ],
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
 
     let acc_holder = TransactionAccountsHolderStub {
-        writable: vec![delegated_id, writable_id],
-        ..Default::default()
+        readonly: vec![],
+        writable: vec![writable_delegated_id, writable_undelegated_id],
+        payer: Pubkey::new_unique(),
     };
 
     let account_metas = TransAccountMetas::from_accounts_holder(
@@ -82,7 +86,8 @@ async fn test_account_meta_one_properly_locked_writable_and_one_unlocked_writabl
     )
     .await
     .unwrap();
-    let endpoint = account_metas.into_endpoint();
+
+    let endpoint = Endpoint::from(account_metas);
 
     eprintln!("{:#?}", endpoint);
     assert!(endpoint.is_unroutable());
@@ -90,10 +95,10 @@ async fn test_account_meta_one_properly_locked_writable_and_one_unlocked_writabl
 
 #[tokio::test]
 async fn test_account_meta_one_improperly_locked_writable_and_one_readonly() {
-    let (delegated_id, _) = delegated_account_ids();
+    let (writable_delegated_id, _) = delegated_account_ids();
     let lockstate_provider = setup_lockstate_provider(
         vec![
-            (delegated_id, account_owned_by_delegation_program()),
+            (writable_delegated_id, account_owned_by_delegation_program()),
             // Missing delegation account
         ],
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
@@ -102,17 +107,18 @@ async fn test_account_meta_one_improperly_locked_writable_and_one_readonly() {
 
     let acc_holder = TransactionAccountsHolderStub {
         readonly: vec![readonly_id],
-        writable: vec![delegated_id],
+        writable: vec![writable_delegated_id],
         payer: Pubkey::new_unique(),
     };
 
-    let endpoint = TransAccountMetas::from_accounts_holder(
-        &acc_holder,
-        &lockstate_provider,
-    )
-    .await
-    .unwrap()
-    .into_endpoint();
+    let endpoint = Endpoint::from(
+        TransAccountMetas::from_accounts_holder(
+            &acc_holder,
+            &lockstate_provider,
+        )
+        .await
+        .unwrap(),
+    );
 
     eprintln!("{:#?}", endpoint);
     assert!(endpoint.is_unroutable());
@@ -121,113 +127,120 @@ async fn test_account_meta_one_improperly_locked_writable_and_one_readonly() {
 #[tokio::test]
 async fn test_account_meta_one_locked_writable_with_invalid_delegation_record_and_one_readonly(
 ) {
-    let (delegated_id, delegation_pda) = delegated_account_ids();
+    let (writable_delegated_id, delegation_pda) = delegated_account_ids();
     let lockstate_provider = setup_lockstate_provider(
         vec![
-            (delegated_id, account_owned_by_delegation_program()),
+            (writable_delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
         ],
-        None,
+        None, // invalid delegation record for delegated account
     );
     let readonly_id = Pubkey::new_from_array([4u8; 32]);
 
     let acc_holder = TransactionAccountsHolderStub {
         readonly: vec![readonly_id],
-        writable: vec![delegated_id],
+        writable: vec![writable_delegated_id],
         payer: Pubkey::new_unique(),
     };
 
-    let endpoint = TransAccountMetas::from_accounts_holder(
-        &acc_holder,
-        &lockstate_provider,
-    )
-    .await
-    .unwrap()
-    .into_endpoint();
+    let endpoint = Endpoint::from(
+        TransAccountMetas::from_accounts_holder(
+            &acc_holder,
+            &lockstate_provider,
+        )
+        .await
+        .unwrap(),
+    );
 
     eprintln!("{:#?}", endpoint);
     assert!(endpoint.is_unroutable());
 }
 
 #[tokio::test]
-async fn test_account_meta_one_properly_locked_writable_and_one_new_writable() {
-    let (delegated_id, delegation_pda) = delegated_account_ids();
+async fn test_account_meta_one_writable_properly_delegated_and_one_writable_new_account(
+) {
+    let (writable_delegated_id, delegation_pda) = delegated_account_ids();
     let lockstate_provider = setup_lockstate_provider(
         vec![
-            (delegated_id, account_owned_by_delegation_program()),
+            (writable_delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
         ],
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
-    let new_writable_id = Pubkey::new_from_array([4u8; 32]);
+
+    let writable_new_account_id = Pubkey::new_from_array([4u8; 32]);
 
     let acc_holder = TransactionAccountsHolderStub {
-        writable: vec![delegated_id, new_writable_id],
+        writable: vec![writable_delegated_id, writable_new_account_id],
         ..Default::default()
     };
 
-    let endpoint = TransAccountMetas::from_accounts_holder(
-        &acc_holder,
-        &lockstate_provider,
-    )
-    .await
-    .unwrap()
-    .into_endpoint();
+    let endpoint = Endpoint::from(
+        TransAccountMetas::from_accounts_holder(
+            &acc_holder,
+            &lockstate_provider,
+        )
+        .await
+        .unwrap(),
+    );
 
     eprintln!("{:#?}", endpoint);
-    assert!(endpoint.is_ephemeral());
+    assert!(endpoint.is_unroutable());
 }
 
 #[tokio::test]
-async fn test_account_meta_one_new_writable() {
+async fn test_account_meta_one_writable_new_account() {
     let lockstate_provider = setup_lockstate_provider(
         vec![],
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
-    let new_writable_id = Pubkey::new_from_array([4u8; 32]);
+
+    let writable_new_account_id = Pubkey::new_from_array([4u8; 32]);
 
     let acc_holder = TransactionAccountsHolderStub {
-        writable: vec![new_writable_id],
+        writable: vec![writable_new_account_id],
         ..Default::default()
     };
 
-    let endpoint = TransAccountMetas::from_accounts_holder(
-        &acc_holder,
-        &lockstate_provider,
-    )
-    .await
-    .unwrap()
-    .into_endpoint();
+    let endpoint = Endpoint::from(
+        TransAccountMetas::from_accounts_holder(
+            &acc_holder,
+            &lockstate_provider,
+        )
+        .await
+        .unwrap(),
+    );
 
     eprintln!("{:#?}", endpoint);
-    assert!(endpoint.is_ephemeral());
+    assert!(endpoint.is_chain());
 }
 
 #[tokio::test]
-async fn test_account_meta_one_unlocked_writable_that_is_payer() {
+async fn test_account_meta_one_undelegated_writable_that_is_payer() {
     // NOTE: it is very rare to encounter a transaction which would only have
     //       write to one account (same as payer) and we don't expect a
     //       transaction like this to make sense inside the ephemeral validator.
     //       That is the main reason we send it to chain
-    let unlocked_writable_id = Pubkey::new_from_array([4u8; 32]);
+    let writable_undelegated_id = Pubkey::new_from_array([4u8; 32]);
     let lockstate_provider = setup_lockstate_provider(
-        vec![(unlocked_writable_id, account_owned_by_system_program())],
+        vec![(writable_undelegated_id, account_owned_by_system_program())],
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
 
     let acc_holder = TransactionAccountsHolderStub {
-        writable: vec![unlocked_writable_id],
-        payer: unlocked_writable_id,
+        writable: vec![writable_undelegated_id],
+        payer: writable_undelegated_id,
         ..Default::default()
     };
 
-    let endpoint = TransAccountMetas::from_accounts_holder(
-        &acc_holder,
-        &lockstate_provider,
-    )
-    .await
-    .unwrap()
-    .into_endpoint();
+    let endpoint = Endpoint::from(
+        TransAccountMetas::from_accounts_holder(
+            &acc_holder,
+            &lockstate_provider,
+        )
+        .await
+        .unwrap(),
+    );
 
     assert!(endpoint.is_chain());
 
@@ -237,32 +250,33 @@ async fn test_account_meta_one_unlocked_writable_that_is_payer() {
 }
 
 #[tokio::test]
-async fn test_account_meta_one_unlocked_writable_that_is_payer_and_locked_writable(
+async fn test_account_meta_one_writable_undelegated_that_is_payer_and_locked_writable(
 ) {
     let (delegated_id, delegation_pda) = delegated_account_ids();
-    let unlocked_writable_id = Pubkey::new_from_array([4u8; 32]);
+    let writable_undelegated_id = Pubkey::new_from_array([4u8; 32]);
     let lockstate_provider = setup_lockstate_provider(
         vec![
             (delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
-            (unlocked_writable_id, account_owned_by_system_program()),
+            (writable_undelegated_id, account_owned_by_system_program()),
         ],
         Some(DelegationRecord::default_with_owner(delegated_id)),
     );
 
     let acc_holder = TransactionAccountsHolderStub {
-        writable: vec![unlocked_writable_id, delegated_id],
-        payer: unlocked_writable_id,
+        writable: vec![writable_undelegated_id, delegated_id],
+        payer: writable_undelegated_id,
         ..Default::default()
     };
 
-    let endpoint = TransAccountMetas::from_accounts_holder(
-        &acc_holder,
-        &lockstate_provider,
-    )
-    .await
-    .unwrap()
-    .into_endpoint();
+    let endpoint = Endpoint::from(
+        TransAccountMetas::from_accounts_holder(
+            &acc_holder,
+            &lockstate_provider,
+        )
+        .await
+        .unwrap(),
+    );
 
     assert!(endpoint.is_ephemeral());
 
@@ -272,31 +286,35 @@ async fn test_account_meta_one_unlocked_writable_that_is_payer_and_locked_writab
 }
 
 #[tokio::test]
-async fn test_account_meta_one_unlocked_writable_that_is_payer_and_unlocked_writable(
+async fn test_account_meta_one_writable_undelegated_that_is_payer_and_writable_undelegated(
 ) {
-    let unlocked_writable_id = Pubkey::new_from_array([3u8; 32]);
-    let payer_writable_id = Pubkey::new_from_array([4u8; 32]);
+    let writable_undelegated_id = Pubkey::new_from_array([3u8; 32]);
+    let writable_undelegated_payer_id = Pubkey::new_from_array([4u8; 32]);
     let lockstate_provider = setup_lockstate_provider(
         vec![
-            (unlocked_writable_id, account_owned_by_system_program()),
-            (payer_writable_id, account_owned_by_system_program()),
+            (writable_undelegated_id, account_owned_by_system_program()),
+            (
+                writable_undelegated_payer_id,
+                account_owned_by_system_program(),
+            ),
         ],
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
 
     let acc_holder = TransactionAccountsHolderStub {
-        writable: vec![payer_writable_id, unlocked_writable_id],
-        payer: payer_writable_id,
-        ..Default::default()
+        readonly: vec![],
+        writable: vec![writable_undelegated_payer_id, writable_undelegated_id],
+        payer: writable_undelegated_payer_id,
     };
 
-    let endpoint = TransAccountMetas::from_accounts_holder(
-        &acc_holder,
-        &lockstate_provider,
-    )
-    .await
-    .unwrap()
-    .into_endpoint();
+    let endpoint = Endpoint::from(
+        TransAccountMetas::from_accounts_holder(
+            &acc_holder,
+            &lockstate_provider,
+        )
+        .await
+        .unwrap(),
+    );
 
     eprintln!("{:#?}", endpoint);
     assert!(endpoint.is_chain());
@@ -307,28 +325,29 @@ async fn test_account_meta_one_unlocked_writable_that_is_payer_and_unlocked_writ
 }
 
 #[tokio::test]
-async fn test_account_meta_one_unlocked_writable_two_readonlys() {
-    let unlocked_writable_id = Pubkey::new_from_array([4u8; 32]);
+async fn test_account_meta_one_writable_undelegated_two_readonlys() {
+    let writable_undelegated_id = Pubkey::new_from_array([4u8; 32]);
     let lockstate_provider = setup_lockstate_provider(
-        vec![(unlocked_writable_id, account_owned_by_system_program())],
+        vec![(writable_undelegated_id, account_owned_by_system_program())],
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
     let readonly1 = Pubkey::new_from_array([4u8; 32]);
     let readonly2 = Pubkey::new_from_array([5u8; 32]);
 
     let acc_holder = TransactionAccountsHolderStub {
-        writable: vec![unlocked_writable_id],
+        writable: vec![writable_undelegated_id],
         readonly: vec![readonly1, readonly2],
         payer: Pubkey::new_unique(),
     };
 
-    let endpoint = TransAccountMetas::from_accounts_holder(
-        &acc_holder,
-        &lockstate_provider,
-    )
-    .await
-    .unwrap()
-    .into_endpoint();
+    let endpoint = Endpoint::from(
+        TransAccountMetas::from_accounts_holder(
+            &acc_holder,
+            &lockstate_provider,
+        )
+        .await
+        .unwrap(),
+    );
 
     eprintln!("{:#?}", endpoint);
     assert!(endpoint.is_chain());
@@ -340,6 +359,7 @@ async fn test_account_meta_two_readonlys() {
         vec![],
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
+
     let readonly1 = Pubkey::new_from_array([4u8; 32]);
     let readonly2 = Pubkey::new_from_array([5u8; 32]);
 
@@ -348,23 +368,25 @@ async fn test_account_meta_two_readonlys() {
         ..Default::default()
     };
 
-    let endpoint = TransAccountMetas::from_accounts_holder(
-        &acc_holder,
-        &lockstate_provider,
-    )
-    .await
-    .unwrap()
-    .into_endpoint();
+    let endpoint = Endpoint::from(
+        TransAccountMetas::from_accounts_holder(
+            &acc_holder,
+            &lockstate_provider,
+        )
+        .await
+        .unwrap(),
+    );
 
     eprintln!("{:#?}", endpoint);
-    assert!(endpoint.is_unroutable());
+    assert!(endpoint.is_chain());
 }
 
 #[tokio::test]
-async fn test_account_meta_two_readonlys_one_program_and_one_writable() {
+async fn test_account_meta_two_readonlys_one_program_and_one_writable_undelegated(
+) {
     let readonly1 = Pubkey::new_from_array([4u8; 32]);
     let readonly2 = Pubkey::new_from_array([5u8; 32]);
-    let writable = Pubkey::new_from_array([6u8; 32]);
+    let writable_undelegated = Pubkey::new_from_array([6u8; 32]);
     let lockstate_provider = setup_lockstate_provider(
         vec![
             (readonly1, account_owned_by_system_program()),
@@ -375,35 +397,23 @@ async fn test_account_meta_two_readonlys_one_program_and_one_writable() {
 
     let acc_holder = TransactionAccountsHolderStub {
         readonly: vec![readonly1, readonly2],
-        writable: vec![writable],
+        writable: vec![writable_undelegated],
         payer: Pubkey::new_unique(),
     };
 
-    let endpoint = TransAccountMetas::from_accounts_holder(
-        &acc_holder,
-        &lockstate_provider,
-    )
-    .await
-    .unwrap()
-    .into_endpoint();
-    assert!(endpoint.is_ephemeral());
+    let endpoint = Endpoint::from(
+        TransAccountMetas::from_accounts_holder(
+            &acc_holder,
+            &lockstate_provider,
+        )
+        .await
+        .unwrap(),
+    );
+    assert!(endpoint.is_chain());
 
     let transaction_metas = endpoint.into_account_metas();
     assert_eq!(transaction_metas.len(), 3);
-    assert_eq!(
-        transaction_metas.readonly_non_program_pubkeys(),
-        vec![readonly1]
-    );
-    assert_eq!(
-        transaction_metas.readonly_program_pubkeys(),
-        vec![readonly2]
-    );
-    assert_eq!(
-        transaction_metas
-            .writable_accounts(false)
-            .into_iter()
-            .map(|x| x.pubkey)
-            .collect::<Vec<_>>(),
-        vec![writable]
-    );
+    assert_eq!(*transaction_metas[0].pubkey(), readonly1);
+    assert_eq!(*transaction_metas[1].pubkey(), readonly2);
+    assert_eq!(*transaction_metas[2].pubkey(), writable_undelegated);
 }

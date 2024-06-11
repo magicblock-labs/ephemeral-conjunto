@@ -14,11 +14,9 @@ Implements account and signature fetching traits using the RPC client
 - `RpcSignatureStatusProvider` struct
   - depends on a `RpcClient`
   - implements `SignatureStatusProvider` from core
-  
 
 # Notes
 
-
 *Important dependencies:*
 
-- Provides `AccountProvider` and `SignatureStatusProvider`: [core](../core/README.md) 
+- Provides `AccountProvider` and `SignatureStatusProvider`: [core](../core/README.md)

@@ -37,4 +37,4 @@ Any response from "chain" or "ephem" is sent directly back to the client
 
 *Important dependencies:*
 
-- Provides `Transwise`: [transwise](../transwise/README.md) 
+- Provides `Transwise`: [transwise](../transwise/README.md)

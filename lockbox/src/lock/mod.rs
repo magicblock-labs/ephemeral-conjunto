@@ -19,7 +19,7 @@ use crate::{
 pub struct LockConfig {
     /// The frequency at which the account should be committed to chain
     pub commit_frequency: CommitFrequency,
-    /// The current owner of delegated/locked accounts is the delegation
+    /// The current owner of delegated accounts is the delegation
     /// program.
     /// Here we include the original owner of the account before delegation.
     /// This info is provided via the delegation record.
@@ -43,30 +43,31 @@ pub enum LockInconsistency {
     DelegationRecordAccountDataInvalid(String),
 }
 
+// TODO(vbrunet) - will this contains account data and be renamed to AccountChainState when we include the account's data?
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum AccountLockState {
-    /// The account is not present on chain and thus not locked either
+    /// The account is not present on chain and thus not delegated either
     /// In this case we assume that this is an account that temporarily exists
     /// on the ephemeral validator and will not have to be undelegated.
     /// However in the short term we don't allow new accounts to be created inside
     /// the validator which means that we reject any transactions that attempt to do
     /// that
     NewAccount,
-    /// The account was found on chain and is not locked and therefore should
+    /// The account was found on chain and is not delegated and therefore should
     /// not be used as writable on the ephemeral validator unless otherwise requested
     /// via the `require_delegation` setting.
     /// If the program was found to be executable it is marked as such via [is_program].
-    Unlocked { is_program: bool },
-    /// The account was found on chain in a proper locked state which means we
+    Undelegated { is_program: bool },
+    /// The account was found on chain in a proper delegated state which means we
     /// also found the related accounts like the buffer and delegation
     /// NOTE: commit records and state diff accountsk are not checked since an
     /// account is delegated and then used before the validator commits a state change.
-    Locked {
+    Delegated {
         delegated_id: Pubkey,
         delegation_pda: Pubkey,
         config: LockConfig,
     },
-    /// The account was found on chain and was partially locked which means that
+    /// The account was found on chain and was partially delegated which means that
     /// it is owned by the delegation program but one or more of the related
     /// accounts were either not present or not owned by the delegation program
     Inconsistent {
@@ -81,21 +82,30 @@ impl AccountLockState {
         matches!(self, AccountLockState::NewAccount)
     }
 
-    pub fn is_locked(&self) -> bool {
-        matches!(self, AccountLockState::Locked { .. })
+    pub fn is_delegated(&self) -> bool {
+        matches!(self, AccountLockState::Delegated { .. })
     }
 
-    pub fn is_unlocked(&self) -> bool {
-        matches!(self, AccountLockState::Unlocked { .. })
+    pub fn is_undelegated(&self) -> bool {
+        matches!(self, AccountLockState::Undelegated { .. })
     }
 
     pub fn is_inconsistent(&self) -> bool {
         matches!(self, AccountLockState::Inconsistent { .. })
     }
 
-    pub fn config(&self) -> Option<&LockConfig> {
+    pub fn is_program(&self) -> Option<bool> {
         match self {
-            AccountLockState::Locked { config, .. } => Some(config),
+            AccountLockState::NewAccount => None,
+            AccountLockState::Undelegated { is_program } => Some(*is_program),
+            AccountLockState::Delegated { .. } => Some(false),
+            AccountLockState::Inconsistent { .. } => Some(false),
+        }
+    }
+
+    pub fn lock_config(&self) -> Option<LockConfig> {
+        match self {
+            AccountLockState::Delegated { config, .. } => Some(config.clone()),
             _ => None,
         }
     }
@@ -155,9 +165,7 @@ impl<T: AccountProvider, U: DelegationRecordParser>
         // we don't know which ones were there and which ones weren't and thus couldn't provide as
         // detailed information about the inconsistencies as we are now.
 
-        let delegation_pda = pda::delegation_pda_from_pubkey(pubkey);
-
-        // 1. Make sure the delegate account exists at all
+        // 1. Make sure the delegated account exists at all
         let account = match self.account_provider.get_account(pubkey).await? {
             Some(acc) => acc,
             None => {
@@ -167,12 +175,13 @@ impl<T: AccountProvider, U: DelegationRecordParser>
 
         // 2. Check that it is locked by the delegation program
         if !is_owned_by_delegation_program(&account) {
-            return Ok(AccountLockState::Unlocked {
+            return Ok(AccountLockState::Undelegated {
                 is_program: account.executable,
             });
         }
 
         // 3. Verify the delegation account exists and is owned by the delegation program
+        let delegation_pda = pda::delegation_pda_from_pubkey(pubkey);
         use DelegationAccount::*;
         match DelegationAccount::try_from_pda_pubkey(
             &delegation_pda,
@@ -184,7 +193,7 @@ impl<T: AccountProvider, U: DelegationRecordParser>
             Valid(DelegationRecord {
                 commit_frequency,
                 owner,
-            }) => Ok(AccountLockState::Locked {
+            }) => Ok(AccountLockState::Delegated {
                 delegated_id: *pubkey,
                 delegation_pda,
                 config: LockConfig {
@@ -198,9 +207,5 @@ impl<T: AccountProvider, U: DelegationRecordParser>
                 inconsistencies,
             }),
         }
-    }
-
-    pub fn account_provider(&self) -> &T {
-        &self.account_provider
     }
 }

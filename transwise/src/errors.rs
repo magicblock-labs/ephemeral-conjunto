@@ -11,18 +11,29 @@ pub enum TranswiseError {
     #[error("CoreError")]
     CoreError(#[from] conjunto_core::errors::CoreError),
 
-    #[error("Not all writable accounts are locked")]
-    NotAllWritablesLocked {
-        locked: Vec<Pubkey>,
-        unlocked: Vec<Pubkey>,
+    #[error("Not all writable accounts are delegated")]
+    NotAllWritablesDelegated {
+        writable_delegated_pubkeys: Vec<Pubkey>,
+        writable_undelegated_non_payer_pubkeys: Vec<Pubkey>,
     },
 
     #[error("Writables inconsistent accounts")]
-    WritablesIncludeInconsistentAccounts { inconsistent: Vec<Pubkey> },
+    WritablesIncludeInconsistentAccounts {
+        writable_inconsistent_pubkeys: Vec<Pubkey>,
+    },
 
     #[error("Writables include new accounts")]
-    WritablesIncludeNewAccounts { new_accounts: Vec<Pubkey> },
+    WritablesIncludeNewAccounts { writable_new_pubkeys: Vec<Pubkey> },
 
     #[error("Transaction is missing payer account")]
     TransactionIsMissingPayerAccount,
+
+    #[error("ValidateAccountsConfig is configured improperly")]
+    ValidateAccountsConfigIsInvalid(String),
+
+    #[error("Creation of ValidatedReadonlyAccount failed ({0})")]
+    CreateValidatedReadonlyAccountFailed(String),
+
+    #[error("Creation of ValidatedWritableAccount failed ({0})")]
+    CreateValidatedWritableAccountFailed(String),
 }

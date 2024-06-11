@@ -1,4 +1,4 @@
-use conjunto_transwise::trans_account_meta::Endpoint;
+use conjunto_transwise::endpoint::Endpoint;
 use jsonrpsee::{
     core::{client::ClientT, RegisterMethodError, RpcResult},
     RpcModule,
@@ -78,10 +78,8 @@ impl DirectorRpc {
         };
         // 3. Route transaction accordingly
         info!("endpoint: {:#?}", endpoint);
-
-        use Endpoint::*;
         match &endpoint {
-            Chain(_) => Ok(self
+            Endpoint::Chain(_) => Ok(self
                 .rpc_chain_client
                 .request("sendTransaction", SendTransactionParams(data, config))
                 .await
@@ -92,7 +90,7 @@ impl DirectorRpc {
                         endpoint,
                     )
                 })?),
-            Ephemeral(_) => Ok(self
+            Endpoint::Ephemeral(_) => Ok(self
                 .rpc_ephem_client
                 .request("sendTransaction", SendTransactionParams(data, config))
                 .await
@@ -103,7 +101,7 @@ impl DirectorRpc {
                         endpoint,
                     )
                 })?),
-            Unroutable {
+            Endpoint::Unroutable {
                 account_metas: _,
                 reason: _,
             } => Err(server_error_with_data(

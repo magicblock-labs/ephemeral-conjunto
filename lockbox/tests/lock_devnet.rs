@@ -46,7 +46,7 @@ async fn test_known_delegation() {
 
     assert_eq!(
         state,
-        AccountLockState::Locked {
+        AccountLockState::Delegated {
             delegated_id,
             delegation_pda: delegation_id,
             config: delegation_record.into(),
@@ -68,5 +68,5 @@ async fn test_system_account_not_delegated() {
         .await
         .unwrap();
 
-    assert!(matches!(state, AccountLockState::Unlocked { .. }));
+    assert!(matches!(state, AccountLockState::Undelegated { .. }));
 }

@@ -1,7 +1,10 @@
 pub use conjunto_lockbox::LockConfig;
 use solana_sdk::pubkey::Pubkey;
 
-use crate::{errors::TranswiseError, trans_account_meta::TransAccountMetas};
+use crate::{
+    errors::TranswiseError,
+    trans_account_meta::{TransAccountMeta, TransAccountMetas},
+};
 
 #[derive(Debug)]
 pub struct ValidateAccountsConfig {
@@ -21,15 +24,37 @@ impl Default for ValidateAccountsConfig {
 #[derive(Debug)]
 pub struct ValidatedReadonlyAccount {
     pub pubkey: Pubkey,
+
+    // The logic here is that this is None if the account doesn't exist
+    // If the account exists, this represents wether or not the account is executable
     pub is_program: Option<bool>,
+}
+
+impl TryFrom<&TransAccountMeta> for ValidatedReadonlyAccount {
+    type Error = TranswiseError;
+    fn try_from(
+        meta: &TransAccountMeta,
+    ) -> Result<ValidatedReadonlyAccount, Self::Error> {
+        match meta {
+            TransAccountMeta::Readonly { pubkey, lockstate } => {
+                Ok(ValidatedReadonlyAccount {
+                    pubkey: *pubkey,
+                    is_program: lockstate.is_program(),
+                })
+            }
+            _ => Err(TranswiseError::CreateValidatedReadonlyAccountFailed(
+                format!("{:?}", meta),
+            )),
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct ValidatedWritableAccount {
     pub pubkey: Pubkey,
 
-    /// The config for locked accounts.
-    /// This is `None` for unlocked writable accounts.
+    /// The config for delegated accounts.
+    /// This is `None` for undelegated or new writable accounts.
     pub lock_config: Option<LockConfig>,
 
     /// Indicates if this account was a payer in the transaction from which
@@ -41,19 +66,33 @@ pub struct ValidatedWritableAccount {
     pub is_new: bool,
 }
 
+impl TryFrom<&TransAccountMeta> for ValidatedWritableAccount {
+    type Error = TranswiseError;
+    fn try_from(
+        meta: &TransAccountMeta,
+    ) -> Result<ValidatedWritableAccount, Self::Error> {
+        match meta {
+            TransAccountMeta::Writable {
+                pubkey,
+                lockstate,
+                is_payer,
+            } => Ok(ValidatedWritableAccount {
+                pubkey: *pubkey,
+                lock_config: lockstate.lock_config(),
+                is_payer: *is_payer,
+                is_new: lockstate.is_new(),
+            }),
+            _ => Err(TranswiseError::CreateValidatedWritableAccountFailed(
+                format!("{:?}", meta),
+            )),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ValidatedAccounts {
     pub readonly: Vec<ValidatedReadonlyAccount>,
     pub writable: Vec<ValidatedWritableAccount>,
-}
-
-impl ValidatedAccounts {
-    pub fn readonly_pubkeys(&self) -> Vec<Pubkey> {
-        self.readonly.iter().map(|x| x.pubkey).collect()
-    }
-    pub fn writable_pubkeys(&self) -> Vec<Pubkey> {
-        self.writable.iter().map(|x| x.pubkey).collect()
-    }
 }
 
 impl TryFrom<(&TransAccountMetas, &ValidateAccountsConfig)>
@@ -62,56 +101,93 @@ impl TryFrom<(&TransAccountMetas, &ValidateAccountsConfig)>
     type Error = TranswiseError;
 
     fn try_from(
-        (meta, config): (&TransAccountMetas, &ValidateAccountsConfig),
+        (metas, config): (&TransAccountMetas, &ValidateAccountsConfig),
     ) -> Result<Self, Self::Error> {
-        let unlocked = meta.unlocked_writables();
+        // We put the following constraint on the config:
+        //
+        // A) the validator CAN create new accounts and can clone ANY account from chain, even non-delegated ones
+        // B) the validator CANNOT create new accounts and can ONLY clone delegated accounts from chain
+        // C) the validator CANNOT create new accounts and can clone ANY account from chain, even non-delegated ones
+        //
+        // This means we disallow the following remaining case:
+        //
+        // D) the validator CAN create new accounts and can ONLY clone delegated accounts from chain
+        // This edge case is difficult to handle properly and most likely not what the user intended for the following reason:
+        // If a transaction has a writable account that does not exist on chain by definition that account is not delegated
+        // and if we accept it as a writable it now violates the delegation requirement.
+        // In short this is a conflicting requirement that we don't allow.
+        if config.require_delegation && config.allow_new_accounts {
+            return Err(TranswiseError::ValidateAccountsConfigIsInvalid(
+                format!("{:?}", config),
+            ));
+        }
+
+        // First, a quick guard against accounts that are inconsistently delegated
+        let writable_inconsistent_pubkeys =
+            metas.writable_inconsistent_pubkeys();
+        let has_writable_inconsistent =
+            !writable_inconsistent_pubkeys.is_empty();
+        if has_writable_inconsistent {
+            return Err(TranswiseError::WritablesIncludeInconsistentAccounts {
+                writable_inconsistent_pubkeys,
+            });
+        }
+
+        // If we require delegation:
+        // We need make sure that all writables are delegated
+        // Except we don't worry about the payer, because it doesn't contain data, it just need to sign
+        if config.require_delegation {
+            let writable_undelegated_non_payer_pubkeys =
+                metas.writable_undelegated_non_payer_pubkeys();
+            let has_writable_undelegated_non_payer =
+                !writable_undelegated_non_payer_pubkeys.is_empty();
+            if has_writable_undelegated_non_payer {
+                let writable_delegated_pubkeys =
+                    metas.writable_delegated_pubkeys();
+                return Err(TranswiseError::NotAllWritablesDelegated {
+                    writable_delegated_pubkeys,
+                    writable_undelegated_non_payer_pubkeys,
+                });
+            }
+        }
+
         // NOTE: when we don't require delegation then we still query the account states to
-        // get the lockstate of each writable. This causes some unnecessary overhead which we
+        // get the lockstate of each delegated. This causes some unnecessary overhead which we
         // could avoid if we make the lockbox aware of this, i.e. by adding an LockstateUnknown
         // variant and returning that instead of checking it.
-        // However this is only the case when developing locally and thus we may not optimize for
-        // it.
-        // We also make an exception for payers of a transaction as those we don't require to be
-        // locked, but instead create and fund them.
-        let has_non_payer_unlocked = unlocked.iter().any(|x| !x.is_payer);
-        if config.require_delegation && has_non_payer_unlocked {
-            return Err(TranswiseError::NotAllWritablesLocked {
-                locked: meta
-                    .locked_writables()
-                    .into_iter()
-                    .map(|x| x.pubkey)
-                    .collect(),
-                unlocked: meta
-                    .unlocked_writables()
-                    .into_iter()
-                    .map(|x| x.pubkey)
-                    .collect(),
-            });
+        // However this is only the case when developing locally and thus we may not optimize for it.
+
+        // Then, if we are not allowed to create new accounts, we need to guard against them
+        if !config.allow_new_accounts {
+            let writable_new_pubkeys = metas.writable_new_pubkeys();
+            let has_writable_new = !writable_new_pubkeys.is_empty();
+            if has_writable_new {
+                return Err(TranswiseError::WritablesIncludeNewAccounts {
+                    writable_new_pubkeys,
+                });
+            }
         }
 
-        let inconsistent = meta.inconsistent_writables();
-        if !inconsistent.is_empty() {
-            return Err(TranswiseError::WritablesIncludeInconsistentAccounts {
-                inconsistent: meta
-                    .inconsistent_writables()
-                    .into_iter()
-                    .map(|x| *x.pubkey())
-                    .collect(),
+        // Generate the validated account structs
+        let (readonly_metas, writable_metas): (Vec<_>, Vec<_>) =
+            metas.iter().partition(|meta| match meta {
+                TransAccountMeta::Readonly { .. } => true,
+                TransAccountMeta::Writable { .. } => false,
             });
-        }
 
-        if !config.allow_new_accounts && !meta.new_writables().is_empty() {
-            return Err(TranswiseError::WritablesIncludeNewAccounts {
-                new_accounts: meta
-                    .new_writables()
-                    .into_iter()
-                    .map(|x| x.pubkey)
-                    .collect(),
-            });
-        }
+        let validated_readonly_accounts = readonly_metas
+            .into_iter()
+            .map(ValidatedReadonlyAccount::try_from)
+            .collect::<Result<Vec<_>, TranswiseError>>()?;
+        let validated_writable_accounts = writable_metas
+            .into_iter()
+            .map(ValidatedWritableAccount::try_from)
+            .collect::<Result<Vec<_>, TranswiseError>>()?;
+
+        // Done
         Ok(ValidatedAccounts {
-            readonly: meta.readonly_accounts(),
-            writable: meta.writable_accounts(!config.require_delegation),
+            readonly: validated_readonly_accounts,
+            writable: validated_writable_accounts,
         })
     }
 }
@@ -126,22 +202,22 @@ mod tests {
         errors::TranswiseResult, trans_account_meta::TransAccountMeta,
     };
 
-    fn config_no_new_accounts() -> ValidateAccountsConfig {
+    fn config_strict() -> ValidateAccountsConfig {
         ValidateAccountsConfig {
             allow_new_accounts: false,
             require_delegation: true,
         }
     }
 
-    fn config_allow_new_accounts() -> ValidateAccountsConfig {
+    fn config_permissive() -> ValidateAccountsConfig {
         ValidateAccountsConfig {
             allow_new_accounts: true,
-            require_delegation: true,
+            require_delegation: false,
         }
     }
 
-    fn locked() -> AccountLockState {
-        AccountLockState::Locked {
+    fn lockstate_delegated() -> AccountLockState {
+        AccountLockState::Delegated {
             delegated_id: Pubkey::new_unique(),
             delegation_pda: Pubkey::new_unique(),
             config: LockConfig {
@@ -151,15 +227,15 @@ mod tests {
         }
     }
 
-    fn unlocked() -> AccountLockState {
-        AccountLockState::Unlocked { is_program: false }
+    fn lockstate_undelegated() -> AccountLockState {
+        AccountLockState::Undelegated { is_program: false }
     }
 
-    fn new_account() -> AccountLockState {
+    fn lockstate_new_account() -> AccountLockState {
         AccountLockState::NewAccount
     }
 
-    fn inconsistent() -> AccountLockState {
+    fn lockstate_inconsistent() -> AccountLockState {
         AccountLockState::Inconsistent {
             delegated_id: Pubkey::new_unique(),
             delegation_pda: Pubkey::new_unique(),
@@ -167,143 +243,190 @@ mod tests {
         }
     }
 
+    fn readonly_pubkeys(vas: &ValidatedAccounts) -> Vec<Pubkey> {
+        vas.readonly.iter().map(|x| x.pubkey).collect()
+    }
+
+    fn writable_pubkeys(vas: &ValidatedAccounts) -> Vec<Pubkey> {
+        vas.writable.iter().map(|x| x.pubkey).collect()
+    }
+
     #[test]
-    fn test_locked_writable_two_readonly() {
-        let readonly_id1 = Pubkey::new_unique();
-        let readonly_id2 = Pubkey::new_unique();
-        let writable_id = Pubkey::new_unique();
+    fn test_two_readonly_undelegated_and_two_writable_delegated_and_payer() {
+        let readonly_undelegated_id1 = Pubkey::new_unique();
+        let readonly_undelegated_id2 = Pubkey::new_unique();
+        let writable_delegated_id1 = Pubkey::new_unique();
+        let writable_delegated_id2 = Pubkey::new_unique();
+        let writable_undelegated_payer_id = Pubkey::new_unique();
 
         let meta1 = TransAccountMeta::Readonly {
-            pubkey: readonly_id1,
-            is_program: None,
+            pubkey: readonly_undelegated_id1,
+            lockstate: lockstate_undelegated(),
         };
         let meta2 = TransAccountMeta::Readonly {
-            pubkey: readonly_id2,
-            is_program: None,
+            pubkey: readonly_undelegated_id2,
+            lockstate: lockstate_undelegated(),
         };
         let meta3 = TransAccountMeta::Writable {
-            pubkey: writable_id,
-            lockstate: locked(),
+            pubkey: writable_delegated_id1,
+            lockstate: lockstate_delegated(),
             is_payer: false,
         };
-
-        let vas: ValidatedAccounts = (
-            &TransAccountMetas(vec![meta1, meta2, meta3]),
-            &config_no_new_accounts(),
-        )
-            .try_into()
-            .unwrap();
-
-        assert_eq!(vas.readonly_pubkeys(), vec![readonly_id1, readonly_id2]);
-        assert_eq!(vas.writable_pubkeys(), vec![writable_id]);
-    }
-
-    #[test]
-    fn test_unlocked_writable_one_readonly() {
-        let readonly_id = Pubkey::new_unique();
-        let writable_id = Pubkey::new_unique();
-
-        let meta1 = TransAccountMeta::Readonly {
-            pubkey: readonly_id,
-            is_program: None,
-        };
-        let meta2 = TransAccountMeta::Writable {
-            pubkey: writable_id,
-            lockstate: unlocked(),
+        let meta4 = TransAccountMeta::Writable {
+            pubkey: writable_delegated_id2,
+            lockstate: lockstate_delegated(),
             is_payer: false,
         };
-
-        let res: TranswiseResult<ValidatedAccounts> = (
-            &TransAccountMetas(vec![meta1, meta2]),
-            &config_no_new_accounts(),
-        )
-            .try_into();
-
-        assert!(res.is_err());
-    }
-
-    #[test]
-    fn test_unlocked_writable_payer_one_readonly() {
-        let readonly_id = Pubkey::new_unique();
-        let writable_id = Pubkey::new_unique();
-
-        let meta1 = TransAccountMeta::Readonly {
-            pubkey: readonly_id,
-            is_program: None,
-        };
-        let meta2 = TransAccountMeta::Writable {
-            pubkey: writable_id,
-            lockstate: unlocked(),
+        let meta5 = TransAccountMeta::Writable {
+            pubkey: writable_undelegated_payer_id,
+            lockstate: lockstate_undelegated(),
             is_payer: true,
         };
 
         let vas: ValidatedAccounts = (
-            &TransAccountMetas(vec![meta1, meta2]),
-            &config_no_new_accounts(),
+            &TransAccountMetas(vec![meta1, meta2, meta3, meta4, meta5]),
+            &config_strict(),
         )
             .try_into()
             .unwrap();
 
-        assert_eq!(vas.readonly_pubkeys(), vec![readonly_id]);
-        assert_eq!(vas.writable_pubkeys(), vec![writable_id]);
+        assert_eq!(
+            readonly_pubkeys(&vas),
+            vec![readonly_undelegated_id1, readonly_undelegated_id2]
+        );
+        assert_eq!(
+            writable_pubkeys(&vas),
+            vec![
+                writable_delegated_id1,
+                writable_delegated_id2,
+                writable_undelegated_payer_id
+            ]
+        );
     }
 
     #[test]
-    fn test_inconsistent_writable_one_readonly() {
-        let readonly_id = Pubkey::new_unique();
-        let writable_id = Pubkey::new_unique();
+    fn test_one_readonly_undelegated_and_one_writable_undelegated_fail() {
+        let readonly_undelegated_id = Pubkey::new_unique();
+        let writable_undelegated_id = Pubkey::new_unique();
 
         let meta1 = TransAccountMeta::Readonly {
-            pubkey: readonly_id,
-            is_program: None,
+            pubkey: readonly_undelegated_id,
+            lockstate: lockstate_undelegated(),
         };
         let meta2 = TransAccountMeta::Writable {
-            pubkey: writable_id,
-            lockstate: inconsistent(),
+            pubkey: writable_undelegated_id,
+            lockstate: lockstate_undelegated(),
             is_payer: false,
         };
 
-        let res: TranswiseResult<ValidatedAccounts> = (
-            &TransAccountMetas(vec![meta1, meta2]),
-            &config_no_new_accounts(),
-        )
-            .try_into();
+        let res: TranswiseResult<ValidatedAccounts> =
+            (&TransAccountMetas(vec![meta1, meta2]), &config_strict())
+                .try_into();
 
         assert!(res.is_err());
     }
 
     #[test]
-    fn test_locked_writable_one_new_writable_one_readonly_allowing_new() {
-        let readonly_id1 = Pubkey::new_unique();
-        let new_writable_id = Pubkey::new_unique();
-        let locked_writable_id = Pubkey::new_unique();
+    fn test_one_readonly_undelegated_and_payer() {
+        let readonly_undelegated_id = Pubkey::new_unique();
+        let writable_undelegated_payer_id = Pubkey::new_unique();
 
         let meta1 = TransAccountMeta::Readonly {
-            pubkey: readonly_id1,
-            is_program: None,
+            pubkey: readonly_undelegated_id,
+            lockstate: lockstate_undelegated(),
         };
         let meta2 = TransAccountMeta::Writable {
-            pubkey: new_writable_id,
-            lockstate: new_account(),
+            pubkey: writable_undelegated_payer_id,
+            lockstate: lockstate_undelegated(),
+            is_payer: true,
+        };
+
+        let vas: ValidatedAccounts =
+            (&TransAccountMetas(vec![meta1, meta2]), &config_strict())
+                .try_into()
+                .unwrap();
+
+        assert_eq!(readonly_pubkeys(&vas), vec![readonly_undelegated_id]);
+        assert_eq!(writable_pubkeys(&vas), vec![writable_undelegated_payer_id]);
+    }
+
+    #[test]
+    fn test_one_readonly_undelegated_and_one_writable_inconsistent() {
+        let readonly_undelegated_id = Pubkey::new_unique();
+        let writable_inconsistent_id = Pubkey::new_unique();
+
+        let meta1 = TransAccountMeta::Readonly {
+            pubkey: readonly_undelegated_id,
+            lockstate: lockstate_undelegated(),
+        };
+        let meta2 = TransAccountMeta::Writable {
+            pubkey: writable_inconsistent_id,
+            lockstate: lockstate_inconsistent(),
+            is_payer: false,
+        };
+
+        let res: TranswiseResult<ValidatedAccounts> =
+            (&TransAccountMetas(vec![meta1, meta2]), &config_strict())
+                .try_into();
+
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_one_readonly_undelegated_and_one_writable_new_account() {
+        let readonly_undelegated_id = Pubkey::new_unique();
+        let writable_new_account_id = Pubkey::new_unique();
+
+        let meta1 = TransAccountMeta::Readonly {
+            pubkey: readonly_undelegated_id,
+            lockstate: lockstate_undelegated(),
+        };
+        let meta2 = TransAccountMeta::Writable {
+            pubkey: writable_new_account_id,
+            lockstate: lockstate_new_account(),
+            is_payer: false,
+        };
+
+        let res: TranswiseResult<ValidatedAccounts> =
+            (&TransAccountMetas(vec![meta1, meta2]), &config_strict())
+                .try_into();
+
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_one_readonly_undelegated_and_one_writable_new_account_and_one_writable_undelegated_while_permissive(
+    ) {
+        let readonly_undelegated_id1 = Pubkey::new_unique();
+        let writable_new_account_id = Pubkey::new_unique();
+        let writable_undelegated_id = Pubkey::new_unique();
+
+        let meta1 = TransAccountMeta::Readonly {
+            pubkey: readonly_undelegated_id1,
+            lockstate: lockstate_undelegated(),
+        };
+        let meta2 = TransAccountMeta::Writable {
+            pubkey: writable_new_account_id,
+            lockstate: lockstate_new_account(),
             is_payer: false,
         };
         let meta3 = TransAccountMeta::Writable {
-            pubkey: locked_writable_id,
-            lockstate: locked(),
+            pubkey: writable_undelegated_id,
+            lockstate: lockstate_delegated(),
             is_payer: false,
         };
 
         let vas: ValidatedAccounts = (
             &TransAccountMetas(vec![meta1, meta2, meta3]),
-            &config_allow_new_accounts(),
+            &config_permissive(),
         )
             .try_into()
             .unwrap();
 
-        assert_eq!(vas.readonly_pubkeys(), vec![readonly_id1]);
+        assert_eq!(readonly_pubkeys(&vas), vec![readonly_undelegated_id1]);
         assert_eq!(
-            vas.writable_pubkeys(),
-            vec![locked_writable_id, new_writable_id]
+            writable_pubkeys(&vas),
+            vec![writable_new_account_id, writable_undelegated_id]
         );
     }
 }
