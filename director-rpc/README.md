@@ -10,6 +10,7 @@ Requests are routed transparently based on type (and content).
 Uses a HTTP RPC server implemented using `jsonrpsee` open-source crate.
 
 Any request from the client is conditionally routed to either:
+
 - the RPC of the "chain" (Solana)
 - the RPC of the "ephem" (Validator)
 

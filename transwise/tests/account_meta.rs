@@ -1,5 +1,5 @@
 use conjunto_core::DelegationRecord;
-use conjunto_lockbox::AccountLockStateProvider;
+use conjunto_lockbox::AccountChainStateProvider;
 use conjunto_test_tools::{
     account_provider_stub::AccountProviderStub,
     accounts::{
@@ -10,20 +10,21 @@ use conjunto_test_tools::{
     transaction_accounts_holder_stub::TransactionAccountsHolderStub,
 };
 use conjunto_transwise::{
-    endpoint::Endpoint, trans_account_meta::TransAccountMetas,
+    endpoint::Endpoint, transaction_account_meta::TransactionAccountMetas,
 };
 use solana_sdk::{account::Account, pubkey::Pubkey};
 
-fn setup_lockstate_provider(
+fn setup_chain_state_provider(
     accounts: Vec<(Pubkey, Account)>,
     record: Option<DelegationRecord>,
-) -> AccountLockStateProvider<AccountProviderStub, DelegationRecordParserStub> {
+) -> AccountChainStateProvider<AccountProviderStub, DelegationRecordParserStub>
+{
     let mut account_provider = AccountProviderStub::default();
     for (pubkey, account) in accounts {
         account_provider.add(pubkey, account);
     }
     let delegation_record_parser = DelegationRecordParserStub::new(record);
-    AccountLockStateProvider::with_provider_and_parser(
+    AccountChainStateProvider::with_provider_and_parser(
         account_provider,
         delegation_record_parser,
     )
@@ -32,7 +33,7 @@ fn setup_lockstate_provider(
 #[tokio::test]
 async fn test_account_meta_one_properly_locked_writable_and_one_readonly() {
     let (writable_delegated_id, delegation_pda) = delegated_account_ids();
-    let lockstate_provider = setup_lockstate_provider(
+    let chain_state_provider = setup_chain_state_provider(
         vec![
             (writable_delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
@@ -47,9 +48,9 @@ async fn test_account_meta_one_properly_locked_writable_and_one_readonly() {
         payer: Pubkey::new_unique(),
     };
 
-    let account_metas = TransAccountMetas::from_accounts_holder(
+    let account_metas = TransactionAccountMetas::from_accounts_holder(
         &acc_holder,
-        &lockstate_provider,
+        &chain_state_provider,
     )
     .await
     .unwrap();
@@ -65,7 +66,7 @@ async fn test_account_meta_one_properly_delegated_writable_and_one_writable_unde
 ) {
     let (writable_delegated_id, delegation_pda) = delegated_account_ids();
     let writable_undelegated_id = Pubkey::new_from_array([4u8; 32]);
-    let lockstate_provider = setup_lockstate_provider(
+    let chain_state_provider = setup_chain_state_provider(
         vec![
             (writable_delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
@@ -80,9 +81,9 @@ async fn test_account_meta_one_properly_delegated_writable_and_one_writable_unde
         payer: Pubkey::new_unique(),
     };
 
-    let account_metas = TransAccountMetas::from_accounts_holder(
+    let account_metas = TransactionAccountMetas::from_accounts_holder(
         &acc_holder,
-        &lockstate_provider,
+        &chain_state_provider,
     )
     .await
     .unwrap();
@@ -96,7 +97,7 @@ async fn test_account_meta_one_properly_delegated_writable_and_one_writable_unde
 #[tokio::test]
 async fn test_account_meta_one_improperly_locked_writable_and_one_readonly() {
     let (writable_delegated_id, _) = delegated_account_ids();
-    let lockstate_provider = setup_lockstate_provider(
+    let chain_state_provider = setup_chain_state_provider(
         vec![
             (writable_delegated_id, account_owned_by_delegation_program()),
             // Missing delegation account
@@ -112,9 +113,9 @@ async fn test_account_meta_one_improperly_locked_writable_and_one_readonly() {
     };
 
     let endpoint = Endpoint::from(
-        TransAccountMetas::from_accounts_holder(
+        TransactionAccountMetas::from_accounts_holder(
             &acc_holder,
-            &lockstate_provider,
+            &chain_state_provider,
         )
         .await
         .unwrap(),
@@ -128,7 +129,7 @@ async fn test_account_meta_one_improperly_locked_writable_and_one_readonly() {
 async fn test_account_meta_one_locked_writable_with_invalid_delegation_record_and_one_readonly(
 ) {
     let (writable_delegated_id, delegation_pda) = delegated_account_ids();
-    let lockstate_provider = setup_lockstate_provider(
+    let chain_state_provider = setup_chain_state_provider(
         vec![
             (writable_delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
@@ -144,9 +145,9 @@ async fn test_account_meta_one_locked_writable_with_invalid_delegation_record_an
     };
 
     let endpoint = Endpoint::from(
-        TransAccountMetas::from_accounts_holder(
+        TransactionAccountMetas::from_accounts_holder(
             &acc_holder,
-            &lockstate_provider,
+            &chain_state_provider,
         )
         .await
         .unwrap(),
@@ -160,7 +161,7 @@ async fn test_account_meta_one_locked_writable_with_invalid_delegation_record_an
 async fn test_account_meta_one_writable_properly_delegated_and_one_writable_new_account(
 ) {
     let (writable_delegated_id, delegation_pda) = delegated_account_ids();
-    let lockstate_provider = setup_lockstate_provider(
+    let chain_state_provider = setup_chain_state_provider(
         vec![
             (writable_delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
@@ -176,9 +177,9 @@ async fn test_account_meta_one_writable_properly_delegated_and_one_writable_new_
     };
 
     let endpoint = Endpoint::from(
-        TransAccountMetas::from_accounts_holder(
+        TransactionAccountMetas::from_accounts_holder(
             &acc_holder,
-            &lockstate_provider,
+            &chain_state_provider,
         )
         .await
         .unwrap(),
@@ -190,7 +191,7 @@ async fn test_account_meta_one_writable_properly_delegated_and_one_writable_new_
 
 #[tokio::test]
 async fn test_account_meta_one_writable_new_account() {
-    let lockstate_provider = setup_lockstate_provider(
+    let chain_state_provider = setup_chain_state_provider(
         vec![],
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
@@ -203,9 +204,9 @@ async fn test_account_meta_one_writable_new_account() {
     };
 
     let endpoint = Endpoint::from(
-        TransAccountMetas::from_accounts_holder(
+        TransactionAccountMetas::from_accounts_holder(
             &acc_holder,
-            &lockstate_provider,
+            &chain_state_provider,
         )
         .await
         .unwrap(),
@@ -222,7 +223,7 @@ async fn test_account_meta_one_undelegated_writable_that_is_payer() {
     //       transaction like this to make sense inside the ephemeral validator.
     //       That is the main reason we send it to chain
     let writable_undelegated_id = Pubkey::new_from_array([4u8; 32]);
-    let lockstate_provider = setup_lockstate_provider(
+    let chain_state_provider = setup_chain_state_provider(
         vec![(writable_undelegated_id, account_owned_by_system_program())],
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
@@ -234,9 +235,9 @@ async fn test_account_meta_one_undelegated_writable_that_is_payer() {
     };
 
     let endpoint = Endpoint::from(
-        TransAccountMetas::from_accounts_holder(
+        TransactionAccountMetas::from_accounts_holder(
             &acc_holder,
-            &lockstate_provider,
+            &chain_state_provider,
         )
         .await
         .unwrap(),
@@ -254,7 +255,7 @@ async fn test_account_meta_one_writable_undelegated_that_is_payer_and_locked_wri
 ) {
     let (delegated_id, delegation_pda) = delegated_account_ids();
     let writable_undelegated_id = Pubkey::new_from_array([4u8; 32]);
-    let lockstate_provider = setup_lockstate_provider(
+    let chain_state_provider = setup_chain_state_provider(
         vec![
             (delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
@@ -270,9 +271,9 @@ async fn test_account_meta_one_writable_undelegated_that_is_payer_and_locked_wri
     };
 
     let endpoint = Endpoint::from(
-        TransAccountMetas::from_accounts_holder(
+        TransactionAccountMetas::from_accounts_holder(
             &acc_holder,
-            &lockstate_provider,
+            &chain_state_provider,
         )
         .await
         .unwrap(),
@@ -290,7 +291,7 @@ async fn test_account_meta_one_writable_undelegated_that_is_payer_and_writable_u
 ) {
     let writable_undelegated_id = Pubkey::new_from_array([3u8; 32]);
     let writable_undelegated_payer_id = Pubkey::new_from_array([4u8; 32]);
-    let lockstate_provider = setup_lockstate_provider(
+    let chain_state_provider = setup_chain_state_provider(
         vec![
             (writable_undelegated_id, account_owned_by_system_program()),
             (
@@ -308,9 +309,9 @@ async fn test_account_meta_one_writable_undelegated_that_is_payer_and_writable_u
     };
 
     let endpoint = Endpoint::from(
-        TransAccountMetas::from_accounts_holder(
+        TransactionAccountMetas::from_accounts_holder(
             &acc_holder,
-            &lockstate_provider,
+            &chain_state_provider,
         )
         .await
         .unwrap(),
@@ -327,7 +328,7 @@ async fn test_account_meta_one_writable_undelegated_that_is_payer_and_writable_u
 #[tokio::test]
 async fn test_account_meta_one_writable_undelegated_two_readonlys() {
     let writable_undelegated_id = Pubkey::new_from_array([4u8; 32]);
-    let lockstate_provider = setup_lockstate_provider(
+    let chain_state_provider = setup_chain_state_provider(
         vec![(writable_undelegated_id, account_owned_by_system_program())],
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
@@ -341,9 +342,9 @@ async fn test_account_meta_one_writable_undelegated_two_readonlys() {
     };
 
     let endpoint = Endpoint::from(
-        TransAccountMetas::from_accounts_holder(
+        TransactionAccountMetas::from_accounts_holder(
             &acc_holder,
-            &lockstate_provider,
+            &chain_state_provider,
         )
         .await
         .unwrap(),
@@ -355,7 +356,7 @@ async fn test_account_meta_one_writable_undelegated_two_readonlys() {
 
 #[tokio::test]
 async fn test_account_meta_two_readonlys() {
-    let lockstate_provider = setup_lockstate_provider(
+    let chain_state_provider = setup_chain_state_provider(
         vec![],
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
@@ -369,9 +370,9 @@ async fn test_account_meta_two_readonlys() {
     };
 
     let endpoint = Endpoint::from(
-        TransAccountMetas::from_accounts_holder(
+        TransactionAccountMetas::from_accounts_holder(
             &acc_holder,
-            &lockstate_provider,
+            &chain_state_provider,
         )
         .await
         .unwrap(),
@@ -387,7 +388,7 @@ async fn test_account_meta_two_readonlys_one_program_and_one_writable_undelegate
     let readonly1 = Pubkey::new_from_array([4u8; 32]);
     let readonly2 = Pubkey::new_from_array([5u8; 32]);
     let writable_undelegated = Pubkey::new_from_array([6u8; 32]);
-    let lockstate_provider = setup_lockstate_provider(
+    let chain_state_provider = setup_chain_state_provider(
         vec![
             (readonly1, account_owned_by_system_program()),
             (readonly2, program_account()),
@@ -402,9 +403,9 @@ async fn test_account_meta_two_readonlys_one_program_and_one_writable_undelegate
     };
 
     let endpoint = Endpoint::from(
-        TransAccountMetas::from_accounts_holder(
+        TransactionAccountMetas::from_accounts_holder(
             &acc_holder,
-            &lockstate_provider,
+            &chain_state_provider,
         )
         .await
         .unwrap(),

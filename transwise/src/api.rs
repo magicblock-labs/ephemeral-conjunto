@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use conjunto_lockbox::{AccountLockStateProvider, DelegationRecordParserImpl};
+use conjunto_lockbox::{AccountChainStateProvider, DelegationRecordParserImpl};
 use conjunto_providers::{
     rpc_account_provider::RpcAccountProvider,
     rpc_provider_config::RpcProviderConfig,
@@ -9,7 +9,7 @@ use solana_sdk::transaction::{SanitizedTransaction, VersionedTransaction};
 use crate::{
     endpoint::Endpoint,
     errors::TranswiseResult,
-    trans_account_meta::TransAccountMetas,
+    transaction_account_meta::TransactionAccountMetas,
     transaction_accounts_holder::TransactionAccountsHolder,
     validated_accounts::{ValidateAccountsConfig, ValidatedAccounts},
 };
@@ -43,7 +43,7 @@ pub trait TransactionAccountsExtractor {
 /// Guiding decisions are made by consulting the state of accounts on chain
 /// See [../examples/guiding_transactions.rs] for more info.
 pub struct Transwise {
-    account_lock_state_provider: AccountLockStateProvider<
+    account_lock_state_provider: AccountChainStateProvider<
         RpcAccountProvider,
         DelegationRecordParserImpl,
     >,
@@ -51,7 +51,7 @@ pub struct Transwise {
 
 impl Transwise {
     pub fn new(config: RpcProviderConfig) -> Self {
-        let account_lock_state_provider = AccountLockStateProvider::<
+        let account_lock_state_provider = AccountChainStateProvider::<
             RpcAccountProvider,
             DelegationRecordParserImpl,
         >::new(config);
@@ -68,8 +68,8 @@ impl Transwise {
     pub async fn account_metas_from_versioned_transaction(
         &self,
         tx: &VersionedTransaction,
-    ) -> TranswiseResult<TransAccountMetas> {
-        TransAccountMetas::from_versioned_transaction(
+    ) -> TranswiseResult<TransactionAccountMetas> {
+        TransactionAccountMetas::from_versioned_transaction(
             tx,
             &self.account_lock_state_provider,
         )
@@ -84,8 +84,8 @@ impl Transwise {
     pub async fn account_metas_from_sanitized_transaction(
         &self,
         tx: &SanitizedTransaction,
-    ) -> TranswiseResult<TransAccountMetas> {
-        TransAccountMetas::from_sanitized_transaction(
+    ) -> TranswiseResult<TransactionAccountMetas> {
+        TransactionAccountMetas::from_sanitized_transaction(
             tx,
             &self.account_lock_state_provider,
         )
@@ -98,8 +98,8 @@ impl Transwise {
     pub async fn account_metas(
         &self,
         accounts: &TransactionAccountsHolder,
-    ) -> TranswiseResult<TransAccountMetas> {
-        TransAccountMetas::from_accounts_holder(
+    ) -> TranswiseResult<TransactionAccountMetas> {
+        TransactionAccountMetas::from_accounts_holder(
             accounts,
             &self.account_lock_state_provider,
         )
@@ -137,7 +137,7 @@ impl ValidatedAccountsProvider for Transwise {
         config: &ValidateAccountsConfig,
     ) -> TranswiseResult<ValidatedAccounts> {
         let account_metas = self.account_metas(transaction_accounts).await?;
-        ValidatedAccounts::try_from((&account_metas, config))
+        ValidatedAccounts::try_from((account_metas, config))
     }
 }
 

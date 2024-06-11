@@ -7,7 +7,7 @@ Also provides account validation implementation.
 # Details
 
 It is used by the validator to fetch information for if/how to clone accounts via `ValidatedAccounts`.
-Internally uses an intermediary representation for the accounts: `TransAccountMetas`.
+Internally uses an intermediary representation for the accounts: `TransactionAccountMetas`.
 Help the director route a transaction properly by computing an `Endpoint`.
 
 *Important symbols:*
@@ -22,14 +22,15 @@ Help the director route a transaction properly by computing an `Endpoint`.
   - classified accounts with meta info and delegation state
 
 - `ValidatedAccountsProvider` trait
-  - Computes `TransactionAccountsHolder` -> `TransAccountMetas` -> `ValidatedAccounts`
+  - Computes `TransactionAccountsHolder` -> `TransactionAccountMetas` -> `ValidatedAccounts`
 
-- `TransAccountMeta` struct
+- `TransactionAccountMeta` struct
   - enum of Writable or Readable
   - contains delegation state and meta info with a pubkey
+  - also contains the actual account data in an `Account` if it was available
 
-- `TransAccountMetas` struct
-  - vec of `TransAccountMeta`
+- `TransactionAccountMetas` struct
+  - vec of `TransactionAccountMeta`
 
 - `Endpoint` enum
   - enum Chain or Ephemeral or Unroutable
@@ -37,11 +38,11 @@ Help the director route a transaction properly by computing an `Endpoint`.
 - `Transwise` struct
   - implements `TransactionAccountsExtractor`
   - implements `ValidatedAccountsProvider`
-  - depends on an `AccountLockStateProvider`
-  - Computes solana transaction -> `TransAccountMetas` -> `Endpoint`
+  - depends on an `AccountChainStateProvider`
+  - Computes solana transaction -> `TransactionAccountMetas` -> `Endpoint`
 
 # Notes
 
 *Important dependencies:*
 
-- Provides `AccountLockStateProvider`: [lockbox](../lockbox/README.md)
+- Provides `AccountChainStateProvider`: [lockbox](../lockbox/README.md)

@@ -1,6 +1,6 @@
 use conjunto_core::{CommitFrequency, DelegationRecord};
 use conjunto_lockbox::{
-    AccountLockState, AccountLockStateProvider, LockInconsistency,
+    AccountChainState, AccountChainStateProvider, LockInconsistency,
 };
 use conjunto_test_tools::{
     account_provider_stub::AccountProviderStub,
@@ -22,7 +22,8 @@ fn default_delegation_record() -> DelegationRecord {
 fn setup(
     accounts: Vec<(Pubkey, Account)>,
     delegation_record: Option<DelegationRecord>,
-) -> AccountLockStateProvider<AccountProviderStub, DelegationRecordParserStub> {
+) -> AccountChainStateProvider<AccountProviderStub, DelegationRecordParserStub>
+{
     let mut account_provider = AccountProviderStub::default();
     for (pubkey, account) in accounts {
         account_provider.add(pubkey, account);
@@ -31,7 +32,7 @@ fn setup(
     if let Some(record) = delegation_record {
         delegation_record_parser.set_next_record(record);
     }
-    AccountLockStateProvider::with_provider_and_parser(
+    AccountChainStateProvider::with_provider_and_parser(
         account_provider,
         delegation_record_parser,
     )
@@ -41,7 +42,7 @@ fn setup(
 async fn test_delegate_properly_delegated() {
     let (delegated_id, delegation_pda) = delegated_account_ids();
     let delegation_record = default_delegation_record();
-    let lockstate_provider = setup(
+    let chain_state_provider = setup(
         vec![
             (delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
@@ -49,14 +50,15 @@ async fn test_delegate_properly_delegated() {
         Some(delegation_record.clone()),
     );
 
-    let state = lockstate_provider
-        .try_lockstate_of_pubkey(&delegated_id)
+    let state = chain_state_provider
+        .try_fetch_chain_state_of_pubkey(&delegated_id)
         .await
         .unwrap();
 
     assert_eq!(
         state,
-        AccountLockState::Delegated {
+        AccountChainState::Delegated {
+            account: account_owned_by_delegation_program(),
             delegated_id,
             delegation_pda,
             config: delegation_record.into(),
@@ -67,7 +69,7 @@ async fn test_delegate_properly_delegated() {
 #[tokio::test]
 async fn test_delegate_undelegated() {
     let (delegated_id, delegation_pda) = delegated_account_ids();
-    let lockstate_provider = setup(
+    let chain_state_provider = setup(
         vec![
             (delegated_id, account_owned_by_system_program()),
             // The other accounts don't matter since we don't check them if no lock is present
@@ -76,18 +78,18 @@ async fn test_delegate_undelegated() {
         None,
     );
 
-    let state = lockstate_provider
-        .try_lockstate_of_pubkey(&delegated_id)
+    let state = chain_state_provider
+        .try_fetch_chain_state_of_pubkey(&delegated_id)
         .await
         .unwrap();
 
-    assert!(matches!(state, AccountLockState::Undelegated { .. }));
+    assert!(matches!(state, AccountChainState::Undelegated { .. }));
 }
 
 #[tokio::test]
 async fn test_delegate_not_found() {
     let (delegated_id, delegation_pda) = delegated_account_ids();
-    let lockstate_provider = setup(
+    let chain_state_provider = setup(
         vec![
             // The other accounts don't matter since we don't check them if delegated
             // account is missing
@@ -96,34 +98,35 @@ async fn test_delegate_not_found() {
         None,
     );
 
-    let state = lockstate_provider
-        .try_lockstate_of_pubkey(&delegated_id)
+    let state = chain_state_provider
+        .try_fetch_chain_state_of_pubkey(&delegated_id)
         .await
         .unwrap();
 
-    assert_eq!(state, AccountLockState::NewAccount);
+    assert_eq!(state, AccountChainState::NewAccount);
 }
 
 #[tokio::test]
 async fn test_delegate_missing_delegate_account() {
     let (delegated_id, delegation_pda) = delegated_account_ids();
 
-    let lockstate_provider = setup(
+    let chain_state_provider = setup(
         vec![(delegated_id, account_owned_by_delegation_program())],
         None,
     );
 
-    let state = lockstate_provider
-        .try_lockstate_of_pubkey(&delegated_id)
+    let state = chain_state_provider
+        .try_fetch_chain_state_of_pubkey(&delegated_id)
         .await
         .unwrap();
 
     assert_eq!(
         state,
-        AccountLockState::Inconsistent {
+        AccountChainState::Inconsistent {
+            account: account_owned_by_delegation_program(),
             delegated_id,
             delegation_pda,
-            inconsistencies: vec![LockInconsistency::DelegationAccountNotFound]
+            inconsistencies: vec![LockInconsistency::DelegationAccountNotFound],
         }
     );
 }
@@ -132,7 +135,7 @@ async fn test_delegate_missing_delegate_account() {
 async fn test_delegate_delegation_not_owned_by_delegate_program() {
     let (delegated_id, delegation_pda) = delegated_account_ids();
     let delegation_record = default_delegation_record();
-    let lockstate_provider = setup(
+    let chain_state_provider = setup(
         vec![
             (delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_system_program()),
@@ -140,14 +143,15 @@ async fn test_delegate_delegation_not_owned_by_delegate_program() {
         Some(delegation_record.clone()),
     );
 
-    let state = lockstate_provider
-        .try_lockstate_of_pubkey(&delegated_id)
+    let state = chain_state_provider
+        .try_fetch_chain_state_of_pubkey(&delegated_id)
         .await
         .unwrap();
 
     assert_eq!(
         state,
-        AccountLockState::Inconsistent {
+        AccountChainState::Inconsistent {
+            account: account_owned_by_delegation_program(),
             delegated_id,
             delegation_pda,
             inconsistencies: vec![
@@ -161,7 +165,7 @@ async fn test_delegate_delegation_not_owned_by_delegate_program() {
 async fn test_delegate_delegation_not_owned_by_delegate_program_and_invalid_record(
 ) {
     let (delegated_id, delegation_pda) = delegated_account_ids();
-    let lockstate_provider = setup(
+    let chain_state_provider = setup(
         vec![
             (delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_system_program()),
@@ -169,14 +173,15 @@ async fn test_delegate_delegation_not_owned_by_delegate_program_and_invalid_reco
         None,
     );
 
-    let state = lockstate_provider
-        .try_lockstate_of_pubkey(&delegated_id)
+    let state = chain_state_provider
+        .try_fetch_chain_state_of_pubkey(&delegated_id)
         .await
         .unwrap();
 
     assert_eq!(
         state,
-        AccountLockState::Inconsistent {
+        AccountChainState::Inconsistent {
+            account: account_owned_by_delegation_program(),
             delegated_id,
             delegation_pda,
             inconsistencies: vec![

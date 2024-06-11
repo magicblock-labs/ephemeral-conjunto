@@ -1,7 +1,7 @@
 
 # Summary
 
-Implements logic for checking accounts delegated state into `AccountLockState`
+Implements logic for checking accounts delegated state into `AccountChainState`
 Accounts are read from a `Pubkey` using `AccountProvider`
 
 # Details
@@ -15,13 +15,14 @@ Accounts are read from a `Pubkey` using `AccountProvider`
 - `DelegationRecordParser` trait
   - allows parsing a blob into a `DelegationRecord`
 
-- `AccountLockState` enum
+- `AccountChainState` enum
   - can be NewAccount / Delegated / Undelegated / Inconsistent
+  - contains the `Account` data and the delegation configuration if available
 
-- `AccountLockStateProvider` struct
+- `AccountChainStateProvider` struct
   - depends on an `AccountProvider`
   - depends on a `DelegationRecordParser`
-  - can read a `Pubkey` -> `DelegationAccount` -> `AccountLockState`
+  - can read a `Pubkey` -> `Account` + `DelegationAccount` -> `AccountChainState`
 
 # Notes
 
