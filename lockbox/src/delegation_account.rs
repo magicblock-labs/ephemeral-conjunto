@@ -97,12 +97,12 @@ mod tests {
     #[test]
     fn test_delegation_record_parser() {
         // NOTE: from delegation-program/tests/fixtures/accounts.rs
-        let delegation_record_account_data: [u8; 88] = [
+        let delegation_record_account_data: [u8; 80] = [
             100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43, 85, 175,
             207, 195, 148, 154, 129, 218, 62, 110, 177, 81, 112, 72, 172, 141,
             157, 3, 211, 24, 26, 191, 79, 101, 191, 48, 19, 105, 181, 70, 132,
-            0, 0, 0, 0, 0, 0, 0, 0, 224, 147, 4, 0, 0, 0, 0, 0,
+            48, 117, 0, 0, 0, 0, 0, 0,
         ];
         let parser = DelegationRecordParserImpl;
         let record = parser.try_parse(&delegation_record_account_data).unwrap();
@@ -113,7 +113,7 @@ mod tests {
                     "3vAK9JQiDsKoQNwmcfeEng4Cnv22pYuj1ASfso7U4ukF"
                 )
                 .unwrap(),
-                commit_frequency: CommitFrequency::Millis(300_000),
+                commit_frequency: CommitFrequency::Millis(30_000),
             }
         );
     }

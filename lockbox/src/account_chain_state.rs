@@ -1,4 +1,3 @@
-use conjunto_addresses::pda;
 use conjunto_core::{
     AccountProvider, DelegationRecord, DelegationRecordParser,
 };
@@ -6,6 +5,7 @@ use conjunto_providers::{
     rpc_account_provider::RpcAccountProvider,
     rpc_provider_config::RpcProviderConfig,
 };
+use dlp::pda;
 use serde::{Deserialize, Serialize};
 use solana_sdk::{account::Account, pubkey::Pubkey};
 
@@ -151,7 +151,7 @@ impl<T: AccountProvider, U: DelegationRecordParser>
         }
 
         // 3. Verify the delegation account exists and is owned by the delegation program
-        let delegation_pda = pda::delegation_pda_from_pubkey(pubkey);
+        let delegation_pda = pda::delegation_record_pda_from_pubkey(pubkey);
         use DelegationAccount::*;
         match DelegationAccount::try_from_pda_pubkey(
             &delegation_pda,

@@ -94,6 +94,8 @@ pub enum ClientSubWithParams {
 
 #[derive(Deserialize)]
 pub struct ClientSubParamsMessage {
+    // NOTE: check if we need params
+    #[allow(dead_code)]
     pub params: ClientSubWithParams,
 }
 
