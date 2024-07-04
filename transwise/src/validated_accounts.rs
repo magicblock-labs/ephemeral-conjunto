@@ -124,6 +124,17 @@ impl TryFrom<(TransactionAccountMetas, &ValidateAccountsConfig)>
             });
         }
 
+        // If we are not allowed to create new accounts, we need to guard against them
+        if !config.allow_new_accounts {
+            let writable_new_pubkeys = metas.writable_new_pubkeys();
+            let has_writable_new = !writable_new_pubkeys.is_empty();
+            if has_writable_new {
+                return Err(TranswiseError::WritablesIncludeNewAccounts {
+                    writable_new_pubkeys,
+                });
+            }
+        }
+
         // If we require delegation:
         // We need make sure that all writables are delegated
         // Except we don't worry about the payer, because it doesn't contain data, it just need to sign
@@ -147,17 +158,6 @@ impl TryFrom<(TransactionAccountMetas, &ValidateAccountsConfig)>
         // could avoid if we make the lockbox aware of this, i.e. by adding an LockstateUnknown
         // variant and returning that instead of checking it.
         // However this is only the case when developing locally and thus we may not optimize for it.
-
-        // Then, if we are not allowed to create new accounts, we need to guard against them
-        if !config.allow_new_accounts {
-            let writable_new_pubkeys = metas.writable_new_pubkeys();
-            let has_writable_new = !writable_new_pubkeys.is_empty();
-            if has_writable_new {
-                return Err(TranswiseError::WritablesIncludeNewAccounts {
-                    writable_new_pubkeys,
-                });
-            }
-        }
 
         // Generate the validated account structs
         let (readonly_metas, writable_metas): (Vec<_>, Vec<_>) =
