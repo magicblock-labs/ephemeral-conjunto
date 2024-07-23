@@ -15,10 +15,18 @@ pub mod guide;
 mod params;
 pub mod passthrough;
 
-#[derive(Default)]
 pub struct DirectorConfig {
-    pub ephem_account_provider_config: RpcProviderConfig,
+    pub ephem_rpc_provider_config: RpcProviderConfig,
     pub chain_cluster: RpcCluster,
+}
+
+impl DirectorConfig {
+    pub fn devnet() -> Self {
+        Self {
+            chain_cluster: RpcCluster::Devnet,
+            ephem_rpc_provider_config: RpcProviderConfig::magicblock_devnet(),
+        }
+    }
 }
 
 pub struct DirectorRpc {
@@ -30,8 +38,8 @@ pub struct DirectorRpc {
 pub fn create_rpc_module(
     config: DirectorConfig,
 ) -> DirectorRpcResult<RpcModule<DirectorRpc>> {
-    let ephem_url = config.ephem_account_provider_config.url().to_string();
-    let transwise = Transwise::new(config.ephem_account_provider_config);
+    let ephem_url = config.ephem_rpc_provider_config.url().to_string();
+    let transwise = Transwise::new(config.ephem_rpc_provider_config);
 
     let rpc_ephem_client = HttpClientBuilder::default().build(ephem_url)?;
     let rpc_chain_client =

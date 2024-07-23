@@ -1,5 +1,7 @@
-use conjunto_director_pubsub::start_pubsub_server;
-use conjunto_director_rpc::start_rpc_server;
+use conjunto_director_pubsub::{
+    director::DirectorPubsubConfig, start_pubsub_server,
+};
+use conjunto_director_rpc::{rpc::DirectorConfig, start_rpc_server};
 use conjunto_providers::{
     rpc_account_provider::RpcAccountProvider,
     rpc_signature_status_provider::RpcSignatureStatusProvider,
@@ -11,14 +13,17 @@ async fn main() {
     env_logger::init();
 
     let (rpc_addr, rpc_handle) =
-        start_rpc_server(Default::default(), None).await.unwrap();
+        start_rpc_server(DirectorConfig::devnet(), None)
+            .await
+            .unwrap();
 
-    let (pubsub_addr, pubsub_handle) = start_pubsub_server::<
-        RpcAccountProvider,
-        RpcSignatureStatusProvider,
-    >(Default::default(), None)
-    .await
-    .unwrap();
+    let (pubsub_addr, pubsub_handle) =
+        start_pubsub_server::<RpcAccountProvider, RpcSignatureStatusProvider>(
+            DirectorPubsubConfig::devnet(),
+            None,
+        )
+        .await
+        .unwrap();
     info!("RPC Server running on: {}", rpc_addr);
     info!("Pubsub Server running on: {}", pubsub_addr);
 

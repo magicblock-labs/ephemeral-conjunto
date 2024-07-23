@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
-use conjunto_core::AccountProvider;
-use conjunto_core::{CommitFrequency, DelegationRecord};
+use conjunto_core::{AccountProvider, CommitFrequency, DelegationRecord};
 use conjunto_lockbox::{AccountChainState, AccountChainStateProvider};
 use conjunto_providers::{
     rpc_account_provider::RpcAccountProvider,
@@ -22,7 +21,7 @@ async fn test_known_delegation() {
     // NOTE: this test depends on these accounts being present on devnet
     // and properly locked
     let rpc_account_provider =
-        RpcAccountProvider::new(RpcProviderConfig::default());
+        RpcAccountProvider::new(RpcProviderConfig::devnet());
 
     let delegated_addr = "8k2V7EzQtNg38Gi9HK5ZtQYp1YpGKNGrMcuGa737gZX4";
     let delegated_id = Pubkey::from_str(delegated_addr).unwrap();
@@ -43,7 +42,7 @@ async fn test_known_delegation() {
         RpcAccountProvider,
         DelegationRecordParserStub,
     >::new_with_parser(
-        RpcProviderConfig::default(),
+        RpcProviderConfig::devnet(),
         delegation_record_parser,
     );
 
@@ -70,7 +69,7 @@ async fn test_system_account_not_delegated() {
     let chain_state_provider = AccountChainStateProvider::<
         RpcAccountProvider,
         DelegationRecordParserStub,
-    >::new(RpcProviderConfig::default());
+    >::new(RpcProviderConfig::devnet());
 
     let chain_state = chain_state_provider
         .try_fetch_chain_state_of_pubkey(&delegated_id)

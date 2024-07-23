@@ -28,7 +28,7 @@ async fn main() {
         Pubkey::from_str("soLXiij6o94fntzfvn2meNybhNfPBviTVuyXLVEtDJ3")
             .unwrap();
 
-    let transwise = Transwise::new(RpcProviderConfig::default());
+    let transwise = Transwise::new(RpcProviderConfig::devnet());
 
     // 1. Transferring to a delegated account
     {

@@ -14,7 +14,7 @@ use tokio_tungstenite::{
 };
 
 mod accept_connection;
-mod director;
+pub mod director;
 pub mod errors;
 mod guide_strategy;
 mod messages;

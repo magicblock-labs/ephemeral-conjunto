@@ -19,14 +19,14 @@ use crate::{
 
 pub struct DirectorPubsubConfig {
     pub chain_cluster: RpcCluster,
-    pub ephemeral_cluster: RpcCluster,
+    pub ephem_rpc_provider_config: RpcProviderConfig,
 }
 
-impl Default for DirectorPubsubConfig {
-    fn default() -> Self {
+impl DirectorPubsubConfig {
+    pub fn devnet() -> Self {
         Self {
-            chain_cluster: Default::default(),
-            ephemeral_cluster: RpcCluster::Development,
+            chain_cluster: RpcCluster::Devnet,
+            ephem_rpc_provider_config: RpcProviderConfig::magicblock_devnet(),
         }
     }
 }
@@ -40,12 +40,12 @@ impl<T: AccountProvider, U: SignatureStatusProvider> DirectorPubsub<T, U> {
     pub fn new(
         config: DirectorPubsubConfig,
     ) -> DirectorPubsub<RpcAccountProvider, RpcSignatureStatusProvider> {
-        let rpc_provider_config =
-            RpcProviderConfig::new(config.ephemeral_cluster.clone(), None);
-        let ephemeral_account_provider =
-            RpcAccountProvider::new(rpc_provider_config.clone());
+        let ephemeral_account_provider: RpcAccountProvider =
+            RpcAccountProvider::new(config.ephem_rpc_provider_config.clone());
         let ephemeral_signature_status_provider =
-            RpcSignatureStatusProvider::new(rpc_provider_config);
+            RpcSignatureStatusProvider::new(
+                config.ephem_rpc_provider_config.clone(),
+            );
         DirectorPubsub::with_providers(
             config,
             ephemeral_account_provider,
@@ -108,7 +108,7 @@ impl<T: AccountProvider, U: SignatureStatusProvider> DirectorPubsub<T, U> {
     pub async fn try_ephemeral_client(
         &self,
     ) -> DirectorPubsubResult<BackendWebSocket> {
-        let url = self.config.ephemeral_cluster.ws_url();
+        let url = self.config.ephem_rpc_provider_config.cluster().ws_url();
         let (socket, _) = connect_async(Url::parse(url)?).await?;
         Ok(socket)
     }
@@ -165,7 +165,7 @@ mod tests {
         signature_status_provider.add_ok(signature());
 
         let director = DirectorPubsub::with_providers(
-            DirectorPubsubConfig::default(),
+            DirectorPubsubConfig::devnet(),
             AccountProviderStub::default(),
             signature_status_provider,
         );
@@ -182,7 +182,7 @@ mod tests {
         let signature_status_provider = SignatureStatusProviderStub::default();
 
         let director = DirectorPubsub::with_providers(
-            DirectorPubsubConfig::default(),
+            DirectorPubsubConfig::devnet(),
             AccountProviderStub::default(),
             signature_status_provider,
         );
@@ -199,7 +199,7 @@ mod tests {
         let signature_status_provider = SignatureStatusProviderStub::default();
 
         let director = DirectorPubsub::with_providers(
-            DirectorPubsubConfig::default(),
+            DirectorPubsubConfig::devnet(),
             AccountProviderStub::default(),
             signature_status_provider,
         );

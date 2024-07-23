@@ -22,11 +22,9 @@ impl RpcAccountProvider {
         );
         Self { rpc_client }
     }
-}
 
-impl Default for RpcAccountProvider {
-    fn default() -> Self {
-        Self::new(RpcProviderConfig::default())
+    pub fn devnet() -> Self {
+        Self::new(RpcProviderConfig::devnet())
     }
 }
 
@@ -70,7 +68,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_non_existing_account() {
-        let rpc_account_provider = RpcAccountProvider::default();
+        // Note: this test relies on devnet
+        let rpc_account_provider = RpcAccountProvider::devnet();
         let pubkey = Pubkey::new_from_array([5; 32]);
         let account = rpc_account_provider.get_account(&pubkey).await.unwrap();
         assert!(account.is_none());
@@ -78,7 +77,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_existing_account() {
-        let rpc_account_provider = RpcAccountProvider::default();
+        // Note: this test relies on devnet
+        let rpc_account_provider = RpcAccountProvider::devnet();
         let pubkey = Pubkey::default();
         let account = rpc_account_provider.get_account(&pubkey).await.unwrap();
         assert!(account.is_some());
@@ -86,7 +86,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_multiple_accounts() {
-        let rpc_account_provider = RpcAccountProvider::default();
+        // Note: this test relies on devnet
+        let rpc_account_provider = RpcAccountProvider::devnet();
         let pubkeys = vec![Pubkey::default(), Pubkey::new_from_array([5; 32])];
         let accounts = rpc_account_provider
             .get_multiple_accounts(&pubkeys)

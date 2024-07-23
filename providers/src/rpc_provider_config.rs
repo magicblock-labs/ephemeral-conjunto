@@ -1,7 +1,7 @@
 use conjunto_addresses::cluster::RpcCluster;
 use solana_sdk::commitment_config::CommitmentLevel;
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct RpcProviderConfig {
     cluster: RpcCluster,
     commitment: Option<CommitmentLevel>,
@@ -32,5 +32,13 @@ impl RpcProviderConfig {
 
     pub fn commitment(&self) -> Option<CommitmentLevel> {
         self.commitment
+    }
+
+    pub fn devnet() -> Self {
+        RpcProviderConfig::new(RpcCluster::Devnet, None)
+    }
+
+    pub fn magicblock_devnet() -> Self {
+        RpcProviderConfig::new(RpcCluster::magicblock_devnet(), None)
     }
 }

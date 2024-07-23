@@ -23,11 +23,6 @@ impl RpcSignatureStatusProvider {
         Self { rpc_client }
     }
 }
-impl Default for RpcSignatureStatusProvider {
-    fn default() -> Self {
-        Self::new(RpcProviderConfig::default())
-    }
-}
 
 #[async_trait]
 impl SignatureStatusProvider for RpcSignatureStatusProvider {
