@@ -36,7 +36,6 @@ Help the director route a transaction properly by computing an `Endpoint`.
   - enum Chain or Ephemeral or Unroutable
 
 - `Transwise` struct
-  - implements `TransactionAccountsExtractor`
   - implements `ValidatedAccountsProvider`
   - depends on an `AccountChainStateProvider`
   - Computes solana transaction -> `TransactionAccountMetas` -> `Endpoint`

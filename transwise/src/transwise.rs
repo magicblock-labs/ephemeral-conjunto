@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use conjunto_lockbox::{AccountChainStateProvider, DelegationRecordParserImpl};
 use conjunto_providers::{
     rpc_account_provider::RpcAccountProvider,
@@ -7,37 +6,10 @@ use conjunto_providers::{
 use solana_sdk::transaction::{SanitizedTransaction, VersionedTransaction};
 
 use crate::{
-    endpoint::Endpoint,
-    errors::TranswiseResult,
+    endpoint::Endpoint, errors::TranswiseResult,
     transaction_account_meta::TransactionAccountMetas,
     transaction_accounts_holder::TransactionAccountsHolder,
-    validated_accounts::{ValidateAccountsConfig, ValidatedAccounts},
 };
-
-#[async_trait]
-pub trait ValidatedAccountsProvider {
-    /// Extracts information of the provided accounts, validates
-    /// them and returns the result containing writable and readonly accounts.
-    /// The checks make sure that all writable accounts are either delegated
-    /// or conform to what's specified in the config.
-    async fn validate_accounts(
-        &self,
-        transaction_accounts: &TransactionAccountsHolder,
-        config: &ValidateAccountsConfig,
-    ) -> TranswiseResult<ValidatedAccounts>;
-}
-
-pub trait TransactionAccountsExtractor {
-    fn try_accounts_from_versioned_transaction(
-        &self,
-        tx: &VersionedTransaction,
-    ) -> TranswiseResult<TransactionAccountsHolder>;
-
-    fn try_accounts_from_sanitized_transaction(
-        &self,
-        tx: &SanitizedTransaction,
-    ) -> TranswiseResult<TransactionAccountsHolder>;
-}
 
 /// The API that allows us to guide a transaction given a cluster
 /// Guiding decisions are made by consulting the state of accounts on chain
@@ -126,33 +98,5 @@ impl Transwise {
         Ok(Endpoint::from(
             self.account_metas_from_sanitized_transaction(tx).await?,
         ))
-    }
-}
-
-#[async_trait]
-impl ValidatedAccountsProvider for Transwise {
-    async fn validate_accounts(
-        &self,
-        transaction_accounts: &TransactionAccountsHolder,
-        config: &ValidateAccountsConfig,
-    ) -> TranswiseResult<ValidatedAccounts> {
-        let account_metas = self.account_metas(transaction_accounts).await?;
-        ValidatedAccounts::try_from((account_metas, config))
-    }
-}
-
-impl TransactionAccountsExtractor for Transwise {
-    fn try_accounts_from_versioned_transaction(
-        &self,
-        tx: &VersionedTransaction,
-    ) -> TranswiseResult<TransactionAccountsHolder> {
-        TransactionAccountsHolder::try_from(tx)
-    }
-
-    fn try_accounts_from_sanitized_transaction(
-        &self,
-        tx: &SanitizedTransaction,
-    ) -> TranswiseResult<TransactionAccountsHolder> {
-        TransactionAccountsHolder::try_from(tx)
     }
 }

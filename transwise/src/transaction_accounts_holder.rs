@@ -13,6 +13,18 @@ pub struct TransactionAccountsHolder {
     pub payer: Pubkey,
 }
 
+impl AccountsHolder for TransactionAccountsHolder {
+    fn get_writable(&self) -> Vec<Pubkey> {
+        self.writable.clone()
+    }
+    fn get_readonly(&self) -> Vec<Pubkey> {
+        self.readonly.clone()
+    }
+    fn get_payer(&self) -> &Pubkey {
+        &self.payer
+    }
+}
+
 impl TryFrom<&SanitizedTransaction> for TransactionAccountsHolder {
     type Error = TranswiseError;
 
@@ -71,17 +83,5 @@ impl TryFrom<&VersionedTransaction> for TransactionAccountsHolder {
             readonly,
             payer: *payer,
         })
-    }
-}
-
-impl AccountsHolder for TransactionAccountsHolder {
-    fn get_writable(&self) -> Vec<Pubkey> {
-        self.writable.clone()
-    }
-    fn get_readonly(&self) -> Vec<Pubkey> {
-        self.readonly.clone()
-    }
-    fn get_payer(&self) -> &Pubkey {
-        &self.payer
     }
 }
