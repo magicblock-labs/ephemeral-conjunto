@@ -1,5 +1,5 @@
 pub use conjunto_lockbox::LockConfig;
-use solana_sdk::{account::Account, pubkey::Pubkey};
+use solana_sdk::{account::Account, clock::Slot, pubkey::Pubkey};
 
 use crate::{
     errors::TranswiseError,
@@ -27,6 +27,7 @@ impl Default for ValidateAccountsConfig {
 pub struct ValidatedReadonlyAccount {
     pub pubkey: Pubkey,
     pub account: Option<Account>,
+    pub at_slot: Slot,
 }
 
 impl TryFrom<TransactionAccountMeta> for ValidatedReadonlyAccount {
@@ -37,10 +38,11 @@ impl TryFrom<TransactionAccountMeta> for ValidatedReadonlyAccount {
         match meta {
             TransactionAccountMeta::Readonly {
                 pubkey,
-                chain_state,
+                chain_snapshot,
             } => Ok(ValidatedReadonlyAccount {
                 pubkey,
-                account: chain_state.into_account(),
+                account: chain_snapshot.chain_state.into_account(),
+                at_slot: chain_snapshot.at_slot,
             }),
             _ => Err(TranswiseError::CreateValidatedReadonlyAccountFailed(
                 format!("{:?}", meta),
@@ -54,6 +56,7 @@ pub struct ValidatedWritableAccount {
     pub pubkey: Pubkey,
     pub account: Option<Account>,
     pub lock_config: Option<LockConfig>,
+    pub at_slot: Slot,
     pub is_payer: bool,
 }
 
@@ -65,12 +68,13 @@ impl TryFrom<TransactionAccountMeta> for ValidatedWritableAccount {
         match meta {
             TransactionAccountMeta::Writable {
                 pubkey,
-                chain_state,
+                chain_snapshot,
                 is_payer,
             } => Ok(ValidatedWritableAccount {
                 pubkey,
-                lock_config: chain_state.lock_config(),
-                account: chain_state.into_account(),
+                lock_config: chain_snapshot.chain_state.lock_config(),
+                account: chain_snapshot.chain_state.into_account(),
+                at_slot: chain_snapshot.at_slot,
                 is_payer,
             }),
             _ => Err(TranswiseError::CreateValidatedWritableAccountFailed(
@@ -186,7 +190,9 @@ impl TryFrom<(TransactionAccountMetas, &ValidateAccountsConfig)>
 #[cfg(test)]
 mod tests {
     use conjunto_core::CommitFrequency;
-    use conjunto_lockbox::{AccountChainState, LockConfig};
+    use conjunto_lockbox::{
+        AccountChainSnapshot, AccountChainState, LockConfig,
+    };
     use conjunto_test_tools::accounts::{
         account_owned_by_delegation_program, account_owned_by_system_program,
     };
@@ -211,34 +217,46 @@ mod tests {
         }
     }
 
-    fn chain_state_delegated() -> AccountChainState {
-        AccountChainState::Delegated {
-            account: account_owned_by_delegation_program(),
-            delegated_id: Pubkey::new_unique(),
-            delegation_pda: Pubkey::new_unique(),
-            config: LockConfig {
-                commit_frequency: CommitFrequency::Millis(1_000),
-                owner: Pubkey::new_unique(),
+    fn chain_snapshot_delegated() -> AccountChainSnapshot {
+        AccountChainSnapshot {
+            at_slot: 42,
+            chain_state: AccountChainState::Delegated {
+                account: account_owned_by_delegation_program(),
+                delegated_id: Pubkey::new_unique(),
+                delegation_pda: Pubkey::new_unique(),
+                config: LockConfig {
+                    commit_frequency: CommitFrequency::Millis(1_000),
+                    owner: Pubkey::new_unique(),
+                },
             },
         }
     }
 
-    fn chain_state_undelegated() -> AccountChainState {
-        AccountChainState::Undelegated {
-            account: account_owned_by_system_program(),
+    fn chain_snapshot_undelegated() -> AccountChainSnapshot {
+        AccountChainSnapshot {
+            at_slot: 42,
+            chain_state: AccountChainState::Undelegated {
+                account: account_owned_by_system_program(),
+            },
         }
     }
 
-    fn chain_state_new_account() -> AccountChainState {
-        AccountChainState::NewAccount
+    fn chain_snapshot_new_account() -> AccountChainSnapshot {
+        AccountChainSnapshot {
+            at_slot: 42,
+            chain_state: AccountChainState::NewAccount,
+        }
     }
 
-    fn chain_state_inconsistent() -> AccountChainState {
-        AccountChainState::Inconsistent {
-            account: account_owned_by_system_program(),
-            delegated_id: Pubkey::new_unique(),
-            delegation_pda: Pubkey::new_unique(),
-            inconsistencies: vec![],
+    fn chain_snapshot_inconsistent() -> AccountChainSnapshot {
+        AccountChainSnapshot {
+            at_slot: 42,
+            chain_state: AccountChainState::Inconsistent {
+                account: account_owned_by_system_program(),
+                delegated_id: Pubkey::new_unique(),
+                delegation_pda: Pubkey::new_unique(),
+                inconsistencies: vec![],
+            },
         }
     }
 
@@ -260,25 +278,25 @@ mod tests {
 
         let meta1 = TransactionAccountMeta::Readonly {
             pubkey: readonly_undelegated_id1,
-            chain_state: chain_state_undelegated(),
+            chain_snapshot: chain_snapshot_undelegated(),
         };
         let meta2 = TransactionAccountMeta::Readonly {
             pubkey: readonly_undelegated_id2,
-            chain_state: chain_state_undelegated(),
+            chain_snapshot: chain_snapshot_undelegated(),
         };
         let meta3 = TransactionAccountMeta::Writable {
             pubkey: writable_delegated_id1,
-            chain_state: chain_state_delegated(),
+            chain_snapshot: chain_snapshot_delegated(),
             is_payer: false,
         };
         let meta4 = TransactionAccountMeta::Writable {
             pubkey: writable_delegated_id2,
-            chain_state: chain_state_delegated(),
+            chain_snapshot: chain_snapshot_delegated(),
             is_payer: false,
         };
         let meta5 = TransactionAccountMeta::Writable {
             pubkey: writable_undelegated_payer_id,
-            chain_state: chain_state_undelegated(),
+            chain_snapshot: chain_snapshot_undelegated(),
             is_payer: true,
         };
 
@@ -310,11 +328,11 @@ mod tests {
 
         let meta1 = TransactionAccountMeta::Readonly {
             pubkey: readonly_undelegated_id,
-            chain_state: chain_state_undelegated(),
+            chain_snapshot: chain_snapshot_undelegated(),
         };
         let meta2 = TransactionAccountMeta::Writable {
             pubkey: writable_undelegated_id,
-            chain_state: chain_state_undelegated(),
+            chain_snapshot: chain_snapshot_undelegated(),
             is_payer: false,
         };
 
@@ -334,11 +352,11 @@ mod tests {
 
         let meta1 = TransactionAccountMeta::Readonly {
             pubkey: readonly_undelegated_id,
-            chain_state: chain_state_undelegated(),
+            chain_snapshot: chain_snapshot_undelegated(),
         };
         let meta2 = TransactionAccountMeta::Writable {
             pubkey: writable_undelegated_payer_id,
-            chain_state: chain_state_undelegated(),
+            chain_snapshot: chain_snapshot_undelegated(),
             is_payer: true,
         };
 
@@ -360,11 +378,11 @@ mod tests {
 
         let meta1 = TransactionAccountMeta::Readonly {
             pubkey: readonly_undelegated_id,
-            chain_state: chain_state_undelegated(),
+            chain_snapshot: chain_snapshot_undelegated(),
         };
         let meta2 = TransactionAccountMeta::Writable {
             pubkey: writable_inconsistent_id,
-            chain_state: chain_state_inconsistent(),
+            chain_snapshot: chain_snapshot_inconsistent(),
             is_payer: false,
         };
 
@@ -384,11 +402,11 @@ mod tests {
 
         let meta1 = TransactionAccountMeta::Readonly {
             pubkey: readonly_new_account_id,
-            chain_state: chain_state_new_account(),
+            chain_snapshot: chain_snapshot_new_account(),
         };
         let meta2 = TransactionAccountMeta::Writable {
             pubkey: writable_undelegated_payer_id,
-            chain_state: chain_state_delegated(),
+            chain_snapshot: chain_snapshot_delegated(),
             is_payer: true,
         };
 
@@ -412,11 +430,11 @@ mod tests {
 
         let meta1 = TransactionAccountMeta::Readonly {
             pubkey: readonly_undelegated_id,
-            chain_state: chain_state_undelegated(),
+            chain_snapshot: chain_snapshot_undelegated(),
         };
         let meta2 = TransactionAccountMeta::Writable {
             pubkey: writable_new_account_id,
-            chain_state: chain_state_new_account(),
+            chain_snapshot: chain_snapshot_new_account(),
             is_payer: false,
         };
 
@@ -438,16 +456,16 @@ mod tests {
 
         let meta1 = TransactionAccountMeta::Readonly {
             pubkey: readonly_undelegated_id1,
-            chain_state: chain_state_undelegated(),
+            chain_snapshot: chain_snapshot_undelegated(),
         };
         let meta2 = TransactionAccountMeta::Writable {
             pubkey: writable_new_account_id,
-            chain_state: chain_state_new_account(),
+            chain_snapshot: chain_snapshot_new_account(),
             is_payer: false,
         };
         let meta3 = TransactionAccountMeta::Writable {
             pubkey: writable_undelegated_id,
-            chain_state: chain_state_delegated(),
+            chain_snapshot: chain_snapshot_delegated(),
             is_payer: false,
         };
 
@@ -475,23 +493,23 @@ mod tests {
 
         let meta1 = TransactionAccountMeta::Readonly {
             pubkey: readonly_new_account_id,
-            chain_state: chain_state_new_account(),
+            chain_snapshot: chain_snapshot_new_account(),
         };
         let meta2 = TransactionAccountMeta::Readonly {
             pubkey: readonly_undelegated_id,
-            chain_state: chain_state_undelegated(),
+            chain_snapshot: chain_snapshot_undelegated(),
         };
         let meta3 = TransactionAccountMeta::Readonly {
             pubkey: readonly_delegated_id,
-            chain_state: chain_state_delegated(),
+            chain_snapshot: chain_snapshot_delegated(),
         };
         let meta4 = TransactionAccountMeta::Readonly {
             pubkey: readonly_inconsistent_id,
-            chain_state: chain_state_inconsistent(),
+            chain_snapshot: chain_snapshot_inconsistent(),
         };
         let meta5 = TransactionAccountMeta::Writable {
             pubkey: writable_delegated_id,
-            chain_state: chain_state_delegated(),
+            chain_snapshot: chain_snapshot_delegated(),
             is_payer: false,
         };
 
@@ -516,6 +534,12 @@ mod tests {
         assert!(vas.readonly[2].account.is_some());
         assert!(vas.readonly[3].account.is_some());
         assert!(vas.writable[0].account.is_some());
+
+        assert_eq!(vas.readonly[0].at_slot, 42);
+        assert_eq!(vas.readonly[1].at_slot, 42);
+        assert_eq!(vas.readonly[2].at_slot, 42);
+        assert_eq!(vas.readonly[3].at_slot, 42);
+        assert_eq!(vas.writable[0].at_slot, 42);
     }
 
     #[test]
@@ -531,34 +555,34 @@ mod tests {
 
         let meta1 = TransactionAccountMeta::Readonly {
             pubkey: readonly_new_account_id,
-            chain_state: chain_state_new_account(),
+            chain_snapshot: chain_snapshot_new_account(),
         };
         let meta2 = TransactionAccountMeta::Readonly {
             pubkey: readonly_undelegated_id,
-            chain_state: chain_state_undelegated(),
+            chain_snapshot: chain_snapshot_undelegated(),
         };
         let meta3 = TransactionAccountMeta::Readonly {
             pubkey: readonly_delegated_id,
-            chain_state: chain_state_delegated(),
+            chain_snapshot: chain_snapshot_delegated(),
         };
         let meta4 = TransactionAccountMeta::Readonly {
             pubkey: readonly_inconsistent_id,
-            chain_state: chain_state_inconsistent(),
+            chain_snapshot: chain_snapshot_inconsistent(),
         };
 
         let meta5 = TransactionAccountMeta::Writable {
             pubkey: writable_new_account_id,
-            chain_state: chain_state_new_account(),
+            chain_snapshot: chain_snapshot_new_account(),
             is_payer: false,
         };
         let meta6 = TransactionAccountMeta::Writable {
             pubkey: writable_undelegated_id,
-            chain_state: chain_state_undelegated(),
+            chain_snapshot: chain_snapshot_undelegated(),
             is_payer: false,
         };
         let meta7 = TransactionAccountMeta::Writable {
             pubkey: writable_delegated_id,
-            chain_state: chain_state_delegated(),
+            chain_snapshot: chain_snapshot_delegated(),
             is_payer: false,
         };
 
@@ -591,5 +615,14 @@ mod tests {
         assert!(vas.writable[0].account.is_none());
         assert!(vas.writable[1].account.is_some());
         assert!(vas.writable[2].account.is_some());
+
+        assert_eq!(vas.readonly[0].at_slot, 42);
+        assert_eq!(vas.readonly[1].at_slot, 42);
+        assert_eq!(vas.readonly[2].at_slot, 42);
+        assert_eq!(vas.readonly[3].at_slot, 42);
+
+        assert_eq!(vas.writable[0].at_slot, 42);
+        assert_eq!(vas.writable[1].at_slot, 42);
+        assert_eq!(vas.writable[2].at_slot, 42);
     }
 }

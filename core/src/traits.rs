@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use solana_sdk::{
-    account::Account, pubkey::Pubkey, signature::Signature, transaction,
+    account::Account, clock::Slot, pubkey::Pubkey, signature::Signature,
+    transaction,
 };
 
 use crate::{errors::CoreResult, DelegationRecord};
@@ -9,12 +10,14 @@ use crate::{errors::CoreResult, DelegationRecord};
 pub trait AccountProvider:
     std::marker::Sync + std::marker::Send + 'static
 {
-    async fn get_account(&self, pubkey: &Pubkey)
-        -> CoreResult<Option<Account>>;
+    async fn get_account(
+        &self,
+        pubkey: &Pubkey,
+    ) -> CoreResult<(Slot, Option<Account>)>;
     async fn get_multiple_accounts(
         &self,
         pubkeys: &[Pubkey],
-    ) -> CoreResult<Vec<Option<Account>>>;
+    ) -> CoreResult<(Slot, Vec<Option<Account>>)>;
 }
 
 pub trait AccountsHolder {

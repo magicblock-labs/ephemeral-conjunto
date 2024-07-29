@@ -85,12 +85,17 @@ impl<T: AccountProvider, U: SignatureStatusProvider>
         };
         let account =
             match self.ephemeral_account_provider.get_account(&pubkey).await {
-                Ok(Some(acc)) => acc,
+                Ok((_, Some(acc))) => acc,
                 // If the ephemeral validator does not have he account then we go to chain for
                 // single requests and to both for subscriptions (since the account may be created
                 // after the subscription)
-                Ok(None) if is_subscription => return RequestEndpoint::Both,
-                Ok(None) => return RequestEndpoint::Chain,
+                Ok((_, None)) => {
+                    if is_subscription {
+                        return RequestEndpoint::Both;
+                    } else {
+                        return RequestEndpoint::Chain;
+                    }
+                }
                 Err(err) => {
                     warn!("Error while fetching account: {:?}", err);
                     // In case of an error the account does not exist or the RPC client

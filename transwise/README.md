@@ -26,8 +26,7 @@ Help the director route a transaction properly by computing an `Endpoint`.
 
 - `TransactionAccountMeta` struct
   - enum of Writable or Readable
-  - contains delegation state and meta info with a pubkey
-  - also contains the actual account data in an `Account` if it was available
+  - contains `AccountChainSnapshot` chain account data and delegation state
 
 - `TransactionAccountMetas` struct
   - vec of `TransactionAccountMeta`
@@ -37,11 +36,11 @@ Help the director route a transaction properly by computing an `Endpoint`.
 
 - `Transwise` struct
   - implements `ValidatedAccountsProvider`
-  - depends on an `AccountChainStateProvider`
+  - depends on an `AccountChainSnapshotProvider`
   - Computes solana transaction -> `TransactionAccountMetas` -> `Endpoint`
 
 # Notes
 
 *Important dependencies:*
 
-- Provides `AccountChainStateProvider`: [lockbox](../lockbox/README.md)
+- Provides `AccountChainSnapshotProvider`: [lockbox](../lockbox/README.md)

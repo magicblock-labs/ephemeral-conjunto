@@ -1,8 +1,8 @@
 use conjunto_core::{
     errors::{CoreError, CoreResult},
-    AccountProvider, CommitFrequency, DelegationRecord, DelegationRecordParser,
+    CommitFrequency, DelegationRecord, DelegationRecordParser,
 };
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::account::Account;
 
 use crate::{
     accounts::predicates::is_owned_by_delegation_program,
@@ -47,24 +47,18 @@ pub enum DelegationAccount {
 }
 
 impl DelegationAccount {
-    pub async fn try_from_pda_pubkey<
-        T: AccountProvider,
-        U: DelegationRecordParser,
-    >(
-        delegation_pda: &Pubkey,
-        account_provider: &T,
+    pub fn try_from_fetched_account<U: DelegationRecordParser>(
+        delegation_fetched_account: Option<Account>,
         delegation_record_parser: &U,
     ) -> LockboxResult<DelegationAccount> {
-        let delegation_account =
-            match account_provider.get_account(delegation_pda).await? {
-                None => {
-                    return Ok(DelegationAccount::Invalid(vec![
-                        LockInconsistency::DelegationAccountNotFound,
-                    ]))
-                }
-                Some(acc) => acc,
-            };
-
+        let delegation_account = match delegation_fetched_account {
+            None => {
+                return Ok(DelegationAccount::Invalid(vec![
+                    LockInconsistency::DelegationAccountNotFound,
+                ]))
+            }
+            Some(acc) => acc,
+        };
         let mut inconsistencies = vec![];
         if !is_owned_by_delegation_program(&delegation_account) {
             inconsistencies
@@ -92,6 +86,8 @@ impl DelegationAccount {
 
 #[cfg(test)]
 mod tests {
+    use solana_sdk::pubkey::Pubkey;
+
     use super::*;
 
     #[test]

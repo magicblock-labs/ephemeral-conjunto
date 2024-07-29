@@ -1,4 +1,6 @@
-use conjunto_lockbox::{AccountChainStateProvider, DelegationRecordParserImpl};
+use conjunto_lockbox::{
+    AccountChainSnapshotProvider, DelegationRecordParserImpl,
+};
 use conjunto_providers::{
     rpc_account_provider::RpcAccountProvider,
     rpc_provider_config::RpcProviderConfig,
@@ -15,7 +17,7 @@ use crate::{
 /// Guiding decisions are made by consulting the state of accounts on chain
 /// See [../examples/guiding_transactions.rs] for more info.
 pub struct Transwise {
-    account_lock_state_provider: AccountChainStateProvider<
+    account_chain_snapshot_provider: AccountChainSnapshotProvider<
         RpcAccountProvider,
         DelegationRecordParserImpl,
     >,
@@ -23,12 +25,12 @@ pub struct Transwise {
 
 impl Transwise {
     pub fn new(config: RpcProviderConfig) -> Self {
-        let account_lock_state_provider = AccountChainStateProvider::<
+        let account_chain_snapshot_provider = AccountChainSnapshotProvider::<
             RpcAccountProvider,
             DelegationRecordParserImpl,
         >::new(config);
         Self {
-            account_lock_state_provider,
+            account_chain_snapshot_provider,
         }
     }
 
@@ -43,7 +45,7 @@ impl Transwise {
     ) -> TranswiseResult<TransactionAccountMetas> {
         TransactionAccountMetas::from_versioned_transaction(
             tx,
-            &self.account_lock_state_provider,
+            &self.account_chain_snapshot_provider,
         )
         .await
     }
@@ -59,7 +61,7 @@ impl Transwise {
     ) -> TranswiseResult<TransactionAccountMetas> {
         TransactionAccountMetas::from_sanitized_transaction(
             tx,
-            &self.account_lock_state_provider,
+            &self.account_chain_snapshot_provider,
         )
         .await
     }
@@ -73,7 +75,7 @@ impl Transwise {
     ) -> TranswiseResult<TransactionAccountMetas> {
         TransactionAccountMetas::from_accounts_holder(
             accounts,
-            &self.account_lock_state_provider,
+            &self.account_chain_snapshot_provider,
         )
         .await
     }

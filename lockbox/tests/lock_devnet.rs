@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use conjunto_core::{AccountProvider, CommitFrequency, DelegationRecord};
-use conjunto_lockbox::{AccountChainState, AccountChainStateProvider};
+use conjunto_lockbox::{AccountChainSnapshotProvider, AccountChainState};
 use conjunto_providers::{
     rpc_account_provider::RpcAccountProvider,
     rpc_provider_config::RpcProviderConfig,
@@ -29,6 +29,7 @@ async fn test_known_delegation() {
         .get_account(&delegated_id)
         .await
         .unwrap()
+        .1
         .unwrap();
 
     let delegation_addr = "CkieZJmrj6dLhwteG69LSutpWwRHiDJY9S8ua7xJ7CRW";
@@ -38,7 +39,7 @@ async fn test_known_delegation() {
     let mut delegation_record_parser = DelegationRecordParserStub::default();
     delegation_record_parser.set_next_record(delegation_record.clone());
 
-    let chain_state_provider = AccountChainStateProvider::<
+    let chain_snapshot_provider = AccountChainSnapshotProvider::<
         RpcAccountProvider,
         DelegationRecordParserStub,
     >::new_with_parser(
@@ -46,13 +47,13 @@ async fn test_known_delegation() {
         delegation_record_parser,
     );
 
-    let state = chain_state_provider
-        .try_fetch_chain_state_of_pubkey(&delegated_id)
+    let chain_snapshot = chain_snapshot_provider
+        .try_fetch_chain_snapshot_of_pubkey(&delegated_id)
         .await
         .unwrap();
 
     assert_eq!(
-        state,
+        chain_snapshot.chain_state,
         AccountChainState::Delegated {
             account: delegated_account,
             delegated_id,
@@ -66,15 +67,18 @@ async fn test_known_delegation() {
 async fn test_system_account_not_delegated() {
     let delegated_id = system_program::id();
 
-    let chain_state_provider = AccountChainStateProvider::<
+    let chain_snapshot_provider = AccountChainSnapshotProvider::<
         RpcAccountProvider,
         DelegationRecordParserStub,
     >::new(RpcProviderConfig::devnet());
 
-    let chain_state = chain_state_provider
-        .try_fetch_chain_state_of_pubkey(&delegated_id)
+    let chain_snapshot = chain_snapshot_provider
+        .try_fetch_chain_snapshot_of_pubkey(&delegated_id)
         .await
         .unwrap();
 
-    assert!(matches!(chain_state, AccountChainState::Undelegated { .. }));
+    assert!(matches!(
+        chain_snapshot.chain_state,
+        AccountChainState::Undelegated { .. }
+    ));
 }

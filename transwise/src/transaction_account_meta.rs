@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use conjunto_core::{AccountProvider, AccountsHolder, DelegationRecordParser};
-use conjunto_lockbox::{AccountChainState, AccountChainStateProvider};
+use conjunto_lockbox::{AccountChainSnapshot, AccountChainSnapshotProvider};
 use serde::{Deserialize, Serialize};
 use solana_sdk::{
     pubkey::Pubkey,
@@ -20,11 +20,11 @@ use crate::{
 pub enum TransactionAccountMeta {
     Readonly {
         pubkey: Pubkey,
-        chain_state: AccountChainState,
+        chain_snapshot: AccountChainSnapshot,
     },
     Writable {
         pubkey: Pubkey,
-        chain_state: AccountChainState,
+        chain_snapshot: AccountChainSnapshot,
         is_payer: bool,
     },
 }
@@ -32,29 +32,29 @@ pub enum TransactionAccountMeta {
 impl TransactionAccountMeta {
     pub async fn try_readonly<T: AccountProvider, U: DelegationRecordParser>(
         pubkey: Pubkey,
-        account_chain_state_provider: &AccountChainStateProvider<T, U>,
+        account_chain_snapshot_provider: &AccountChainSnapshotProvider<T, U>,
     ) -> TranswiseResult<Self> {
-        let chain_state = account_chain_state_provider
-            .try_fetch_chain_state_of_pubkey(&pubkey)
+        let chain_snapshot = account_chain_snapshot_provider
+            .try_fetch_chain_snapshot_of_pubkey(&pubkey)
             .await?;
         Ok(TransactionAccountMeta::Readonly {
             pubkey,
-            chain_state,
+            chain_snapshot,
         })
     }
 
     pub async fn try_writable<T: AccountProvider, U: DelegationRecordParser>(
         pubkey: Pubkey,
-        account_chain_state_provider: &AccountChainStateProvider<T, U>,
+        account_chain_snapshot_provider: &AccountChainSnapshotProvider<T, U>,
         payer: &Pubkey,
     ) -> TranswiseResult<Self> {
-        let chain_state = account_chain_state_provider
-            .try_fetch_chain_state_of_pubkey(&pubkey)
+        let chain_snapshot = account_chain_snapshot_provider
+            .try_fetch_chain_snapshot_of_pubkey(&pubkey)
             .await?;
         let is_payer = pubkey == *payer;
         Ok(TransactionAccountMeta::Writable {
             pubkey,
-            chain_state,
+            chain_snapshot,
             is_payer,
         })
     }
@@ -66,10 +66,14 @@ impl TransactionAccountMeta {
         }
     }
 
-    pub fn chain_state(&self) -> &AccountChainState {
+    pub fn chain_snapshot(&self) -> &AccountChainSnapshot {
         match self {
-            TransactionAccountMeta::Readonly { chain_state, .. } => chain_state,
-            TransactionAccountMeta::Writable { chain_state, .. } => chain_state,
+            TransactionAccountMeta::Readonly { chain_snapshot, .. } => {
+                chain_snapshot
+            }
+            TransactionAccountMeta::Writable { chain_snapshot, .. } => {
+                chain_snapshot
+            }
         }
     }
 
@@ -101,11 +105,14 @@ impl TransactionAccountMetas {
         U: DelegationRecordParser,
     >(
         tx: &VersionedTransaction,
-        account_chain_state_provider: &AccountChainStateProvider<T, U>,
+        account_chain_snapshot_provider: &AccountChainSnapshotProvider<T, U>,
     ) -> TranswiseResult<Self> {
         let tx_accounts = TransactionAccountsHolder::try_from(tx)?;
-        Self::from_accounts_holder(&tx_accounts, account_chain_state_provider)
-            .await
+        Self::from_accounts_holder(
+            &tx_accounts,
+            account_chain_snapshot_provider,
+        )
+        .await
     }
 
     pub async fn from_sanitized_transaction<
@@ -113,11 +120,14 @@ impl TransactionAccountMetas {
         U: DelegationRecordParser,
     >(
         tx: &SanitizedTransaction,
-        account_chain_state_provider: &AccountChainStateProvider<T, U>,
+        account_chain_snapshot_provider: &AccountChainSnapshotProvider<T, U>,
     ) -> TranswiseResult<Self> {
         let tx_accounts = TransactionAccountsHolder::try_from(tx)?;
-        Self::from_accounts_holder(&tx_accounts, account_chain_state_provider)
-            .await
+        Self::from_accounts_holder(
+            &tx_accounts,
+            account_chain_snapshot_provider,
+        )
+        .await
     }
 
     pub async fn from_accounts_holder<
@@ -126,7 +136,7 @@ impl TransactionAccountMetas {
         V: DelegationRecordParser,
     >(
         holder: &U,
-        account_chain_state_provider: &AccountChainStateProvider<T, V>,
+        account_chain_snapshot_provider: &AccountChainSnapshotProvider<T, V>,
     ) -> TranswiseResult<Self> {
         let mut account_metas = Vec::new();
         let readonly = holder.get_readonly();
@@ -135,7 +145,7 @@ impl TransactionAccountMetas {
             account_metas.push(
                 TransactionAccountMeta::try_readonly(
                     pubkey,
-                    account_chain_state_provider,
+                    account_chain_snapshot_provider,
                 )
                 .await?,
             );
@@ -143,7 +153,7 @@ impl TransactionAccountMetas {
         for pubkey in writable.into_iter() {
             let account_meta = TransactionAccountMeta::try_writable(
                 pubkey,
-                account_chain_state_provider,
+                account_chain_snapshot_provider,
                 holder.get_payer(),
             )
             .await?;
@@ -155,8 +165,8 @@ impl TransactionAccountMetas {
     pub fn writable_inconsistent_pubkeys(&self) -> Vec<Pubkey> {
         self.iter()
             .filter(|x| match x {
-                TransactionAccountMeta::Writable { chain_state, .. } => {
-                    chain_state.is_inconsistent()
+                TransactionAccountMeta::Writable { chain_snapshot, .. } => {
+                    chain_snapshot.chain_state.is_inconsistent()
                 }
                 _ => false,
             })
@@ -167,8 +177,8 @@ impl TransactionAccountMetas {
     pub fn writable_delegated_pubkeys(&self) -> Vec<Pubkey> {
         self.iter()
             .filter(|x| match x {
-                TransactionAccountMeta::Writable { chain_state, .. } => {
-                    chain_state.is_delegated()
+                TransactionAccountMeta::Writable { chain_snapshot, .. } => {
+                    chain_snapshot.chain_state.is_delegated()
                 }
                 _ => false,
             })
@@ -181,9 +191,9 @@ impl TransactionAccountMetas {
             .filter(|x| match x {
                 TransactionAccountMeta::Writable {
                     is_payer,
-                    chain_state,
+                    chain_snapshot,
                     ..
-                } => !chain_state.is_delegated() && !is_payer,
+                } => !chain_snapshot.chain_state.is_delegated() && !is_payer,
                 _ => false,
             })
             .map(|x| *x.pubkey())
@@ -193,8 +203,8 @@ impl TransactionAccountMetas {
     pub fn writable_new_pubkeys(&self) -> Vec<Pubkey> {
         self.iter()
             .filter(|x| match x {
-                TransactionAccountMeta::Writable { chain_state, .. } => {
-                    chain_state.is_new()
+                TransactionAccountMeta::Writable { chain_snapshot, .. } => {
+                    chain_snapshot.chain_state.is_new()
                 }
                 _ => false,
             })
