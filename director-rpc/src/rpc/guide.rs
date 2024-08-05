@@ -79,7 +79,7 @@ impl DirectorRpc {
         // 3. Route transaction accordingly
         info!("endpoint: {:#?}", endpoint);
         match &endpoint {
-            Endpoint::Chain(_) => Ok(self
+            Endpoint::Chain { .. } => Ok(self
                 .rpc_chain_client
                 .request("sendTransaction", SendTransactionParams(data, config))
                 .await
@@ -90,7 +90,7 @@ impl DirectorRpc {
                         endpoint,
                     )
                 })?),
-            Endpoint::Ephemeral(_) => Ok(self
+            Endpoint::Ephemeral { .. } => Ok(self
                 .rpc_ephem_client
                 .request("sendTransaction", SendTransactionParams(data, config))
                 .await
@@ -101,10 +101,7 @@ impl DirectorRpc {
                         endpoint,
                     )
                 })?),
-            Endpoint::Unroutable {
-                account_metas: _,
-                reason: _,
-            } => Err(server_error_with_data(
+            Endpoint::Unroutable { .. } => Err(server_error_with_data(
                 "Transaction is unroutable".to_string(),
                 ServerErrorCode::TransactionUnroutable,
                 endpoint,

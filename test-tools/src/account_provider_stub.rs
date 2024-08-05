@@ -6,6 +6,7 @@ use solana_sdk::{account::Account, clock::Slot, pubkey::Pubkey};
 
 #[derive(Default)]
 pub struct AccountProviderStub {
+    pub at_slot: Slot,
     pub accounts: HashMap<Pubkey, Account>,
 }
 
@@ -21,7 +22,7 @@ impl AccountProvider for AccountProviderStub {
         &self,
         pubkey: &Pubkey,
     ) -> CoreResult<(Slot, Option<Account>)> {
-        Ok((0, self.accounts.get(pubkey).cloned()))
+        Ok((self.at_slot, self.accounts.get(pubkey).cloned()))
     }
 
     async fn get_multiple_accounts(
@@ -29,7 +30,7 @@ impl AccountProvider for AccountProviderStub {
         pubkeys: &[Pubkey],
     ) -> CoreResult<(Slot, Vec<Option<Account>>)> {
         Ok((
-            0,
+            self.at_slot,
             pubkeys
                 .iter()
                 .map(|pubkey| self.accounts.get(pubkey).cloned())

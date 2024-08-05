@@ -14,4 +14,6 @@ pub enum LockboxError {
         fetched_pubkeys: Vec<Pubkey>,
         fetched_accounts: Vec<Option<Account>>,
     },
+    #[error("Failed to parse account data")]
+    FailedToParseDelegationRecord(String),
 }

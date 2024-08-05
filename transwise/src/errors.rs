@@ -30,10 +30,4 @@ pub enum TranswiseError {
 
     #[error("ValidateAccountsConfig is configured improperly")]
     ValidateAccountsConfigIsInvalid(String),
-
-    #[error("Creation of ValidatedReadonlyAccount failed ({0})")]
-    CreateValidatedReadonlyAccountFailed(String),
-
-    #[error("Creation of ValidatedWritableAccount failed ({0})")]
-    CreateValidatedWritableAccountFailed(String),
 }

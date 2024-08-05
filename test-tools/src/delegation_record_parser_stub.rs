@@ -1,6 +1,7 @@
 use conjunto_core::{
+    delegation_record::DelegationRecord,
+    delegation_record_parser::DelegationRecordParser,
     errors::{CoreError, CoreResult},
-    DelegationRecord, DelegationRecordParser,
 };
 
 #[derive(Default)]

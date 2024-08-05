@@ -1,7 +1,9 @@
+use conjunto_core::{
+    delegation_inconsistency::DelegationInconsistency,
+    delegation_record::DelegationRecord,
+};
 use serde::{Deserialize, Serialize};
 use solana_sdk::{account::Account, pubkey::Pubkey};
-
-use crate::{LockConfig, LockInconsistency};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum AccountChainState {
@@ -21,18 +23,16 @@ pub enum AccountChainState {
     /// account is delegated and then used before the validator commits a state change.
     Delegated {
         account: Account,
-        delegated_id: Pubkey,
         delegation_pda: Pubkey,
-        config: LockConfig,
+        delegation_record: DelegationRecord,
     },
     /// The account was found on chain and was partially delegated which means that
     /// it is owned by the delegation program but one or more of the related
     /// accounts were either not present or not owned by the delegation program
     Inconsistent {
         account: Account,
-        delegated_id: Pubkey,
         delegation_pda: Pubkey,
-        inconsistencies: Vec<LockInconsistency>,
+        delegation_inconsistencies: Vec<DelegationInconsistency>,
     },
 }
 
@@ -53,14 +53,16 @@ impl AccountChainState {
         matches!(self, AccountChainState::Inconsistent { .. })
     }
 
-    pub fn lock_config(&self) -> Option<LockConfig> {
+    pub fn delegation_record(&self) -> Option<&DelegationRecord> {
         match self {
-            AccountChainState::Delegated { config, .. } => Some(config.clone()),
+            AccountChainState::Delegated {
+                delegation_record, ..
+            } => Some(delegation_record),
             _ => None,
         }
     }
 
-    pub fn into_account(self) -> Option<Account> {
+    pub fn account(&self) -> Option<&Account> {
         match self {
             AccountChainState::NewAccount => None,
             AccountChainState::Undelegated { account } => Some(account),

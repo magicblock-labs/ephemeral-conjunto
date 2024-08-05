@@ -874,6 +874,7 @@ version = "0.0.0"
 dependencies = [
  "async-trait",
  "conjunto-core",
+ "conjunto-lockbox",
  "env_logger 0.11.3",
  "log",
  "solana-sdk",
@@ -888,6 +889,7 @@ dependencies = [
  "conjunto-lockbox",
  "conjunto-providers",
  "conjunto-test-tools",
+ "futures-util",
  "serde",
  "solana-sdk",
  "thiserror",

@@ -12,6 +12,7 @@ async-trait = { workspace = true }
 conjunto-core = { workspace = true }
 conjunto-lockbox = { workspace = true }
 conjunto-providers = { workspace = true }
+futures-util = { workspace = true }
 serde = { workspace = true }
 solana-sdk = { workspace = true }
 thiserror = { workspace = true }

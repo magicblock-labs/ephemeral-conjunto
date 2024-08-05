@@ -1,13 +1,12 @@
 
 # Summary
 
-The main purpose is to process a transaction and pull out information for each account used in it.
-Also provides account validation implementation.
+The main purpose of this crate is to process transactions accounts information.
 
 # Details
 
-It is used by the validator to fetch information for if/how to clone accounts via `ValidatedAccounts`.
-Internally uses an intermediary representation for the accounts: `TransactionAccountMetas`.
+It is used by the validator to check if a transaction is valid using `TransactionAccountsValidator`.
+Internally uses an intermediary representation for the transactions accounts: `TransactionAccountsSnapshot`.
 Help the director route a transaction properly by computing an `Endpoint`.
 
 *Important symbols:*
@@ -18,29 +17,29 @@ Help the director route a transaction properly by computing an `Endpoint`.
 - `TransactionAccountsExtractor` trait
   - allow conversion from solana transactions to `TransactionAccountsHolder`
 
-- `ValidatedAccounts` struct
-  - classified accounts with meta info and delegation state
+- `TransactionAccountsSnapshot` struct
+  - readonly and writable vecs of `AccountChainSnapshot`
 
-- `ValidatedAccountsProvider` trait
-  - Computes `TransactionAccountsHolder` -> `TransactionAccountMetas` -> `ValidatedAccounts`
+- `TransactionAccountsValidator` trait
+  - takes a `TransactionAccountsSnapshot` and check if it can be a valid ephemeral transaction
 
-- `TransactionAccountMeta` struct
-  - enum of Writable or Readable
-  - contains `AccountChainSnapshot` chain account data and delegation state
+- `AccountFetcher` trait
+  - Allows fetching `TransactionAccountsSnapshot` from a `TransactionAccountsHolder`
 
-- `TransactionAccountMetas` struct
-  - vec of `TransactionAccountMeta`
+- `RemoteAccountFetcher`
+  - Internally uses an `AccountChainSnapshotProvider`
+  - Implements `AccountFetcher`
 
 - `Endpoint` enum
   - enum Chain or Ephemeral or Unroutable
+  - can be created from a `TransactionAccountsSnapshot`
 
 - `Transwise` struct
-  - implements `ValidatedAccountsProvider`
-  - depends on an `AccountChainSnapshotProvider`
-  - Computes solana transaction -> `TransactionAccountMetas` -> `Endpoint`
+  - Internally uses `RemoteAccountFetcher`
+  - Also allows conversion from solana transaction -> `Endpoint`
 
 # Notes
 
 *Important dependencies:*
 
-- Provides `AccountChainSnapshotProvider`: [lockbox](../lockbox/README.md)
+- Provides `AccountChainSnapshot` and `AccountChainSnapshotProvider`: [lockbox](../lockbox/README.md)

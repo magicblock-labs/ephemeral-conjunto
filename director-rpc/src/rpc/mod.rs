@@ -1,6 +1,6 @@
 use conjunto_addresses::cluster::RpcCluster;
 use conjunto_providers::rpc_provider_config::RpcProviderConfig;
-use conjunto_transwise::Transwise;
+use conjunto_transwise::transwise::Transwise;
 use jsonrpsee::{
     http_client::{HttpClient, HttpClientBuilder},
     RpcModule,

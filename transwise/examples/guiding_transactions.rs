@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use conjunto_providers::rpc_provider_config::RpcProviderConfig;
 use conjunto_test_tools::accounts::delegated_account_ids;
-use conjunto_transwise::Transwise;
+use conjunto_transwise::transwise::Transwise;
 use solana_sdk::{
     hash::Hash,
     pubkey::Pubkey,

@@ -8,10 +8,6 @@ Accounts are read from a `Pubkey` using `AccountProvider`
 
 *Important symbols:*
 
-- `DelegationAccount` enum
-  - can be Valid or Invalid
-  - contains `DelegationRecord` (from core) if valid
-
 - `DelegationRecordParser` trait
   - allows parsing a blob into a `DelegationRecord`
 
@@ -25,7 +21,7 @@ Accounts are read from a `Pubkey` using `AccountProvider`
 - `AccountChainSnapshotProvider` struct
   - depends on an `AccountProvider`
   - depends on a `DelegationRecordParser`
-  - can read a `Pubkey` -> `Account` + `DelegationAccount` -> `AccountChainSnapshot`
+  - can read a `Pubkey` -> `Account` + `DelegationRecord` -> `AccountChainSnapshot`
 
 # Notes
 

@@ -78,14 +78,18 @@ pub enum ClientSubWithParams {
     /// Handled by the ephem validator except for two cases:
     /// - AllWithVotes
     /// - Mentions of an account that the ephem validator does not have
-    // NOTE: this needs to be first so `params: [ all ]` does not match the
-    //       less specific `SingleAddressParamSubscribe` below
+    ///
+    /// NOTE: this needs to be first so `params: [ all ]` does not match the
+    ///       less specific `SingleAddressParamSubscribe` below
     #[serde(untagged)]
     LogsSubscribe { params: GetLogFilterParam },
+
     /// AccountSubscribe:
     /// - handled by the ephem cluster if it has that account, otherwise by chain
+    ///
     /// ProgramSubscribe:
     /// - handled by the ephem validator if it has that program, otherwise by chain
+    ///
     /// SignatureSubscribe
     /// - Handled by the ephem validator if it has that signature, otherwise by chain
     #[serde(untagged)]

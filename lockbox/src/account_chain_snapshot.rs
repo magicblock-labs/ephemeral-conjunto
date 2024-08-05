@@ -1,23 +1,21 @@
 use conjunto_core::{
-    AccountProvider, DelegationRecord, DelegationRecordParser,
-};
-use conjunto_providers::{
-    rpc_account_provider::RpcAccountProvider,
-    rpc_provider_config::RpcProviderConfig,
+    delegation_inconsistency::DelegationInconsistency,
+    delegation_record::DelegationRecord,
+    delegation_record_parser::DelegationRecordParser, AccountProvider,
 };
 use dlp::pda;
 use serde::{Deserialize, Serialize};
 use solana_sdk::{account::Account, clock::Slot, pubkey::Pubkey};
 
 use crate::{
+    account_chain_state::AccountChainState,
     accounts::predicates::is_owned_by_delegation_program,
-    delegation_account::{DelegationAccount, DelegationRecordParserImpl},
     errors::{LockboxError, LockboxResult},
-    AccountChainState, LockConfig,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AccountChainSnapshot {
+    pub pubkey: Pubkey,
     pub at_slot: Slot,
     pub chain_state: AccountChainState,
 }
@@ -30,38 +28,15 @@ pub struct AccountChainSnapshotProvider<
     delegation_record_parser: U,
 }
 
+enum AccountChainSnapshotProviderDelegation {
+    Valid(DelegationRecord),
+    Invalid(Vec<DelegationInconsistency>),
+}
+
 impl<T: AccountProvider, U: DelegationRecordParser>
     AccountChainSnapshotProvider<T, U>
 {
-    pub fn new(
-        config: RpcProviderConfig,
-    ) -> AccountChainSnapshotProvider<
-        RpcAccountProvider,
-        DelegationRecordParserImpl,
-    > {
-        let rpc_account_provider = RpcAccountProvider::new(config);
-        let delegation_record_parser = DelegationRecordParserImpl;
-        AccountChainSnapshotProvider::with_provider_and_parser(
-            rpc_account_provider,
-            delegation_record_parser,
-        )
-    }
-
-    pub fn new_with_parser(
-        config: RpcProviderConfig,
-        delegation_record_parser: U,
-    ) -> AccountChainSnapshotProvider<RpcAccountProvider, U> {
-        let rpc_account_provider = RpcAccountProvider::new(config);
-        AccountChainSnapshotProvider::with_provider_and_parser(
-            rpc_account_provider,
-            delegation_record_parser,
-        )
-    }
-
-    pub fn with_provider_and_parser(
-        account_provider: T,
-        delegation_record_parser: U,
-    ) -> Self {
+    pub fn new(account_provider: T, delegation_record_parser: U) -> Self {
         Self {
             account_provider,
             delegation_record_parser,
@@ -85,6 +60,7 @@ impl<T: AccountProvider, U: DelegationRecordParser>
             &mut fetched_accounts,
         )
         .map(|chain_state| AccountChainSnapshot {
+            pubkey: *pubkey,
             at_slot,
             chain_state,
         })
@@ -115,29 +91,64 @@ impl<T: AccountProvider, U: DelegationRecordParser>
             });
         }
         // Verify the delegation account exists and is owned by the delegation program
-        match DelegationAccount::try_from_fetched_account(
+        match self.read_delegated_account_from_fetched_account(
             fetched_accounts.remove(0),
-            &self.delegation_record_parser,
-        )? {
-            DelegationAccount::Valid(DelegationRecord {
-                commit_frequency,
-                owner,
-            }) => Ok(AccountChainState::Delegated {
+        ) {
+            AccountChainSnapshotProviderDelegation::Valid(
+                delegation_record,
+            ) => Ok(AccountChainState::Delegated {
                 account: base_account,
-                delegated_id: *pubkey,
                 delegation_pda,
-                config: LockConfig {
-                    commit_frequency,
-                    owner,
-                },
+                delegation_record,
             }),
-            DelegationAccount::Invalid(inconsistencies) => {
-                Ok(AccountChainState::Inconsistent {
-                    account: base_account,
-                    delegated_id: *pubkey,
-                    delegation_pda,
-                    inconsistencies,
-                })
+            AccountChainSnapshotProviderDelegation::Invalid(
+                delegation_inconsistencies,
+            ) => Ok(AccountChainState::Inconsistent {
+                account: base_account,
+                delegation_pda,
+                delegation_inconsistencies,
+            }),
+        }
+    }
+
+    fn read_delegated_account_from_fetched_account(
+        &self,
+        fetched_delegation_account: Option<Account>,
+    ) -> AccountChainSnapshotProviderDelegation {
+        let delegation_account = match fetched_delegation_account {
+            None => {
+                return AccountChainSnapshotProviderDelegation::Invalid(vec![
+                    DelegationInconsistency::AccountNotFound,
+                ])
+            }
+            Some(account) => account,
+        };
+        let mut inconsistencies = vec![];
+        if !is_owned_by_delegation_program(&delegation_account) {
+            inconsistencies.push(DelegationInconsistency::AccountInvalidOwner);
+        }
+        match self
+            .delegation_record_parser
+            .try_parse(&delegation_account.data)
+        {
+            Ok(delegation_record) => {
+                if inconsistencies.is_empty() {
+                    AccountChainSnapshotProviderDelegation::Valid(
+                        delegation_record,
+                    )
+                } else {
+                    AccountChainSnapshotProviderDelegation::Invalid(
+                        inconsistencies,
+                    )
+                }
+            }
+            Err(err) => {
+                inconsistencies.push(
+                    DelegationInconsistency::RecordAccountDataInvalid(
+                        err.to_string(),
+                    ),
+                );
+                AccountChainSnapshotProviderDelegation::Invalid(inconsistencies)
             }
         }
     }
