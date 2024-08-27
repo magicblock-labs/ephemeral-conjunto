@@ -2,7 +2,7 @@ use conjunto_core::{
     delegation_record::{CommitFrequency, DelegationRecord},
     delegation_record_parser::DelegationRecordParser,
 };
-use conjunto_lockbox::delegation_record_parser::DelegationRecordParserImpl;
+use conjunto_lockbox::delegation_record_parser_impl::DelegationRecordParserImpl;
 use solana_sdk::pubkey::Pubkey;
 
 #[test]

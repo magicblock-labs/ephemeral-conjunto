@@ -20,12 +20,6 @@ pub trait AccountProvider:
     ) -> CoreResult<(Slot, Vec<Option<Account>>)>;
 }
 
-pub trait AccountsHolder {
-    fn get_writable(&self) -> Vec<Pubkey>;
-    fn get_readonly(&self) -> Vec<Pubkey>;
-    fn get_payer(&self) -> &Pubkey;
-}
-
 #[async_trait]
 pub trait SignatureStatusProvider:
     std::marker::Sync + std::marker::Send + 'static

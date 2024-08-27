@@ -3,9 +3,8 @@ use conjunto_core::{
     delegation_record::{CommitFrequency, DelegationRecord},
 };
 use conjunto_lockbox::{
-    account_chain_snapshot::{
-        AccountChainSnapshot, AccountChainSnapshotProvider,
-    },
+    account_chain_snapshot::AccountChainSnapshot,
+    account_chain_snapshot_provider::AccountChainSnapshotProvider,
     account_chain_state::AccountChainState,
 };
 use conjunto_test_tools::{

@@ -1,10 +1,15 @@
-use conjunto_providers::rpc_provider_config::RpcProviderConfig;
+use conjunto_lockbox::{
+    account_chain_snapshot_provider::AccountChainSnapshotProvider,
+    delegation_record_parser_impl::DelegationRecordParserImpl,
+};
+use conjunto_providers::{
+    rpc_account_provider::RpcAccountProvider,
+    rpc_provider_config::RpcProviderConfig,
+};
 use solana_sdk::transaction::{SanitizedTransaction, VersionedTransaction};
 
 use crate::{
-    account_fetcher::{AccountFetcher, RemoteAccountFetcher},
-    endpoint::Endpoint,
-    errors::TranswiseResult,
+    endpoint::Endpoint, errors::TranswiseResult,
     transaction_accounts_holder::TransactionAccountsHolder,
     transaction_accounts_snapshot::TransactionAccountsSnapshot,
 };
@@ -13,13 +18,20 @@ use crate::{
 /// Guiding decisions are made by consulting the state of accounts on chain
 /// See [../examples/guiding_transactions.rs] for more info.
 pub struct Transwise {
-    account_fetcher: RemoteAccountFetcher,
+    account_chain_snapshot_provider: AccountChainSnapshotProvider<
+        RpcAccountProvider,
+        DelegationRecordParserImpl,
+    >,
 }
 
 impl Transwise {
     pub fn new(config: RpcProviderConfig) -> Self {
+        let account_chain_snapshot_provider = AccountChainSnapshotProvider::new(
+            RpcAccountProvider::new(config),
+            DelegationRecordParserImpl,
+        );
         Self {
-            account_fetcher: RemoteAccountFetcher::new(config),
+            account_chain_snapshot_provider,
         }
     }
 
@@ -56,11 +68,11 @@ impl Transwise {
         &self,
         tx: &VersionedTransaction,
     ) -> TranswiseResult<TransactionAccountsSnapshot> {
-        self.account_fetcher
-            .fetch_transaction_accounts_snapshot(
-                &TransactionAccountsHolder::try_from(tx)?,
-            )
-            .await
+        TransactionAccountsSnapshot::from_accounts_holder(
+            &TransactionAccountsHolder::try_from(tx)?,
+            &self.account_chain_snapshot_provider,
+        )
+        .await
     }
 
     /// Extracts information of all accounts involved in the transaction and
@@ -72,10 +84,10 @@ impl Transwise {
         &self,
         tx: &SanitizedTransaction,
     ) -> TranswiseResult<TransactionAccountsSnapshot> {
-        self.account_fetcher
-            .fetch_transaction_accounts_snapshot(
-                &TransactionAccountsHolder::try_from(tx)?,
-            )
-            .await
+        TransactionAccountsSnapshot::from_accounts_holder(
+            &TransactionAccountsHolder::try_from(tx)?,
+            &self.account_chain_snapshot_provider,
+        )
+        .await
     }
 }

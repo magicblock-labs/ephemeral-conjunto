@@ -5,7 +5,7 @@ use conjunto_core::{
     AccountProvider,
 };
 use conjunto_lockbox::{
-    account_chain_snapshot::AccountChainSnapshotProvider,
+    account_chain_snapshot_provider::AccountChainSnapshotProvider,
     account_chain_state::AccountChainState,
 };
 use conjunto_providers::{

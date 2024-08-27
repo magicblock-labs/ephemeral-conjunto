@@ -1,6 +1,6 @@
 use std::vec;
 
-use conjunto_lockbox::account_chain_snapshot::AccountChainSnapshotProvider;
+use conjunto_lockbox::account_chain_snapshot_provider::AccountChainSnapshotProvider;
 use conjunto_test_tools::{
     account_provider_stub::AccountProviderStub,
     accounts::{
@@ -8,10 +8,10 @@ use conjunto_test_tools::{
         delegated_account_ids, program_account,
     },
     delegation_record_parser_stub::DelegationRecordParserStub,
-    transaction_accounts_holder_stub::TransactionAccountsHolderStub,
 };
 use conjunto_transwise::{
     endpoint::{Endpoint, UnroutableReason},
+    transaction_accounts_holder::TransactionAccountsHolder,
     transaction_accounts_snapshot::TransactionAccountsSnapshot,
     DelegationRecord,
 };
@@ -50,7 +50,7 @@ async fn test_one_new_account_readonly_and_one_delegated_writable() {
     let readonly_new_account_id = Pubkey::new_unique();
     let payer_id = Pubkey::new_unique();
 
-    let acc_holder = TransactionAccountsHolderStub {
+    let acc_holder = TransactionAccountsHolder {
         readonly: vec![readonly_new_account_id],
         writable: vec![writable_delegated_id],
         payer: payer_id,
@@ -100,7 +100,7 @@ async fn test_one_writable_delegated_and_one_writable_undelegated() {
     );
     let payer_id = Pubkey::new_unique();
 
-    let acc_holder = TransactionAccountsHolderStub {
+    let acc_holder = TransactionAccountsHolder {
         readonly: vec![],
         writable: vec![writable_delegated_id, writable_undelegated_id],
         payer: payer_id,
@@ -151,7 +151,7 @@ async fn test_one_writable_inconsistent_with_missing_delegation_account() {
     );
     let payer_id = Pubkey::new_unique();
 
-    let acc_holder = TransactionAccountsHolderStub {
+    let acc_holder = TransactionAccountsHolder {
         readonly: vec![],
         writable: vec![writable_inconsistent_id],
         payer: payer_id,
@@ -201,7 +201,7 @@ async fn test_one_writable_inconsistent_with_invalid_delegation_record() {
     );
     let payer_id = Pubkey::new_unique();
 
-    let acc_holder = TransactionAccountsHolderStub {
+    let acc_holder = TransactionAccountsHolder {
         readonly: vec![],
         writable: vec![writable_inconsistent_id],
         payer: payer_id,
@@ -249,7 +249,7 @@ async fn test_one_writable_delegated_and_one_writable_new_account() {
     let writable_new_account_id = Pubkey::new_unique();
     let payer_id = Pubkey::new_unique();
 
-    let acc_holder = TransactionAccountsHolderStub {
+    let acc_holder = TransactionAccountsHolder {
         readonly: vec![],
         writable: vec![writable_delegated_id, writable_new_account_id],
         payer: payer_id,
@@ -298,7 +298,7 @@ async fn test_one_writable_new_account() {
     let writable_new_account_id = Pubkey::new_unique();
     let payer_id = Pubkey::new_unique();
 
-    let acc_holder = TransactionAccountsHolderStub {
+    let acc_holder = TransactionAccountsHolder {
         readonly: vec![],
         writable: vec![writable_new_account_id],
         payer: payer_id,
@@ -342,7 +342,7 @@ async fn test_one_writable_undelegated_that_is_payer() {
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
 
-    let acc_holder = TransactionAccountsHolderStub {
+    let acc_holder = TransactionAccountsHolder {
         readonly: vec![],
         writable: vec![writable_undelegated_id],
         payer: writable_undelegated_id,
@@ -388,7 +388,7 @@ async fn test_one_writable_undelegated_that_is_payer_and_one_writable_delegated(
         Some(DelegationRecord::default_with_owner(writable_delegated_id)),
     );
 
-    let acc_holder = TransactionAccountsHolderStub {
+    let acc_holder = TransactionAccountsHolder {
         readonly: vec![],
         writable: vec![writable_undelegated_id, writable_delegated_id],
         payer: writable_undelegated_id,
@@ -440,7 +440,7 @@ async fn test_account_meta_one_writable_undelegated_that_is_payer_and_writable_u
         Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
     );
 
-    let acc_holder = TransactionAccountsHolderStub {
+    let acc_holder = TransactionAccountsHolder {
         readonly: vec![],
         writable: vec![writable_undelegated_payer_id, writable_undelegated_id],
         payer: writable_undelegated_payer_id,
@@ -489,7 +489,7 @@ async fn test_two_readonly_new_accounts() {
     let readonly2_new_account_id = Pubkey::new_unique();
     let payer_id = Pubkey::new_unique();
 
-    let acc_holder = TransactionAccountsHolderStub {
+    let acc_holder = TransactionAccountsHolder {
         readonly: vec![readonly1_new_account_id, readonly2_new_account_id],
         writable: vec![],
         payer: payer_id,
@@ -535,7 +535,7 @@ async fn test_two_readonly_new_accounts_and_one_writable_undelegated() {
     let readonly2_new_account_id = Pubkey::new_unique();
     let payer_id = Pubkey::new_unique();
 
-    let acc_holder = TransactionAccountsHolderStub {
+    let acc_holder = TransactionAccountsHolder {
         readonly: vec![readonly1_new_account_id, readonly2_new_account_id],
         writable: vec![writable_undelegated_id],
         payer: payer_id,
@@ -586,7 +586,7 @@ async fn test_two_readonly_undelegated_and_one_writable_new_account() {
     );
     let payer_id = Pubkey::new_unique();
 
-    let acc_holder = TransactionAccountsHolderStub {
+    let acc_holder = TransactionAccountsHolder {
         readonly: vec![readonly1_undelegated_id, readonly2_undelegated_id],
         writable: vec![writable_new_account_id],
         payer: payer_id,
