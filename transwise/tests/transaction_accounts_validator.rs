@@ -28,6 +28,7 @@ fn chain_snapshot_delegated() -> AccountChainSnapshotShared {
             delegation_record: DelegationRecord {
                 commit_frequency: CommitFrequency::Millis(1_000),
                 owner: Pubkey::new_unique(),
+                delegation_slot: 0,
             },
         },
     }

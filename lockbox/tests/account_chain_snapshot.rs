@@ -23,6 +23,7 @@ fn default_delegation_record() -> DelegationRecord {
     DelegationRecord {
         commit_frequency: CommitFrequency::Millis(1_000),
         owner: Pubkey::new_unique(),
+        delegation_slot: 0,
     }
 }
 

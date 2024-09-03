@@ -35,6 +35,8 @@ impl From<CommitFrequency> for Duration {
 pub struct DelegationRecord {
     /// The original owner of the account
     pub owner: Pubkey,
+    /// The slot at which the delegation was created
+    pub delegation_slot: u64,
     /// The frequency at which to commit the account state of the ephemeral
     /// validator to the chain.
     pub commit_frequency: CommitFrequency,
@@ -44,6 +46,7 @@ impl DelegationRecord {
     pub fn default_with_owner(owner: Pubkey) -> Self {
         Self {
             owner,
+            delegation_slot: 0,
             commit_frequency: CommitFrequency::Millis(1_000),
         }
     }

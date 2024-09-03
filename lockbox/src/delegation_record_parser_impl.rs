@@ -33,6 +33,7 @@ fn parse_delegation_record(data: &[u8]) -> CoreResult<DelegationRecord> {
     let state = result.unwrap();
     Ok(DelegationRecord {
         owner: state.owner,
+        delegation_slot: state.delegation_slot,
         commit_frequency: CommitFrequency::Millis(state.commit_frequency_ms),
     })
 }
