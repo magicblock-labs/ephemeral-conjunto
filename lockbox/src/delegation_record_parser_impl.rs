@@ -20,17 +20,15 @@ fn parse_delegation_record(data: &[u8]) -> CoreResult<DelegationRecord> {
     // NOTE: I didn't find 100% confirmation that vecs are always correctly aligned, but
     // the issue I encountered was fixed by this change.
     // TODO(thlorenz): with this fix we copy data and should revisit this to avoid that
-    let data = data.to_vec();
-    let result =
-        bytemuck::try_from_bytes::<dlp::state::DelegationRecord>(&data[8..])
+    let aligned_data = data[8..].to_vec();
+    let state =
+        bytemuck::try_from_bytes::<dlp::state::DelegationRecord>(&aligned_data)
             .map_err(|err| {
                 CoreError::FailedToParseDelegationRecord(format!(
                     "Failed to deserialize DelegationRecord: {}",
                     err
                 ))
-            });
-
-    let state = result.unwrap();
+            })?;
     Ok(DelegationRecord {
         owner: state.owner,
         delegation_slot: state.delegation_slot,
