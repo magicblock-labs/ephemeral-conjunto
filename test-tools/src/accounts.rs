@@ -1,6 +1,4 @@
-use std::str::FromStr;
-
-use solana_sdk::{account::Account, pubkey::Pubkey, system_program};
+use solana_sdk::{account::Account, pubkey, pubkey::Pubkey, system_program};
 
 /// The bytes of the program ID of the delegation program
 pub const DELEGATION_PROGRAM_ARRAY: [u8; 32] = [
@@ -34,11 +32,8 @@ pub fn program_account() -> Account {
 }
 
 pub fn delegated_account_ids() -> (Pubkey, Pubkey) {
-    let delegated_addr = "8k2V7EzQtNg38Gi9HK5ZtQYp1YpGKNGrMcuGa737gZX4";
-    let delegated_id = Pubkey::from_str(delegated_addr).unwrap();
-
-    let delegation_addr = "CkieZJmrj6dLhwteG69LSutpWwRHiDJY9S8ua7xJ7CRW";
-    let delegation_pda = Pubkey::from_str(delegation_addr).unwrap();
-
+    let delegated_id = pubkey!("8k2V7EzQtNg38Gi9HK5ZtQYp1YpGKNGrMcuGa737gZX4");
+    let delegation_pda =
+        pubkey!("CkieZJmrj6dLhwteG69LSutpWwRHiDJY9S8ua7xJ7CRW");
     (delegated_id, delegation_pda)
 }

@@ -13,7 +13,7 @@ use conjunto_transwise::{
     endpoint::{Endpoint, UnroutableReason},
     transaction_accounts_holder::TransactionAccountsHolder,
     transaction_accounts_snapshot::TransactionAccountsSnapshot,
-    DelegationRecord,
+    CommitFrequency, DelegationRecord,
 };
 use solana_sdk::{account::Account, clock::Slot, pubkey::Pubkey};
 
@@ -37,6 +37,15 @@ fn setup_chain_snapshot_provider(
     )
 }
 
+fn dummy_delegation_record_with_owner(owner: Pubkey) -> DelegationRecord {
+    DelegationRecord {
+        authority: Pubkey::new_unique(),
+        owner,
+        delegation_slot: 0,
+        commit_frequency: CommitFrequency::Millis(1_000),
+    }
+}
+
 #[tokio::test]
 async fn test_one_new_account_readonly_and_one_delegated_writable() {
     let (writable_delegated_id, delegation_pda) = delegated_account_ids();
@@ -45,7 +54,7 @@ async fn test_one_new_account_readonly_and_one_delegated_writable() {
             (writable_delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
         ],
-        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
+        Some(dummy_delegation_record_with_owner(Pubkey::new_unique())),
     );
     let readonly_new_account_id = Pubkey::new_unique();
     let payer_id = Pubkey::new_unique();
@@ -76,7 +85,6 @@ async fn test_one_new_account_readonly_and_one_delegated_writable() {
 
     let endpoint = Endpoint::from(acc_snapshot.clone());
 
-    eprintln!("{:#?}", endpoint);
     assert_eq!(
         endpoint,
         Endpoint::Ephemeral {
@@ -96,7 +104,7 @@ async fn test_one_writable_delegated_and_one_writable_undelegated() {
             (delegation_pda, account_owned_by_delegation_program()),
             (writable_undelegated_id, account_owned_by_system_program()),
         ],
-        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
+        Some(dummy_delegation_record_with_owner(Pubkey::new_unique())),
     );
     let payer_id = Pubkey::new_unique();
 
@@ -126,7 +134,6 @@ async fn test_one_writable_delegated_and_one_writable_undelegated() {
 
     let endpoint = Endpoint::from(acc_snapshot.clone());
 
-    eprintln!("{:#?}", endpoint);
     assert_eq!(endpoint, Endpoint::Unroutable {
         transaction_accounts_snapshot: acc_snapshot,
         reason: UnroutableReason::ContainsWritableDelegatedAndWritableUndelegated {
@@ -147,7 +154,7 @@ async fn test_one_writable_inconsistent_with_missing_delegation_account() {
             ),
             // Missing delegation account
         ],
-        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
+        Some(dummy_delegation_record_with_owner(Pubkey::new_unique())),
     );
     let payer_id = Pubkey::new_unique();
 
@@ -174,7 +181,6 @@ async fn test_one_writable_inconsistent_with_missing_delegation_account() {
 
     let endpoint = Endpoint::from(acc_snapshot.clone());
 
-    eprintln!("{:#?}", endpoint);
     assert_eq!(
         endpoint,
         Endpoint::Unroutable {
@@ -224,7 +230,6 @@ async fn test_one_writable_inconsistent_with_invalid_delegation_record() {
 
     let endpoint = Endpoint::from(acc_snapshot.clone());
 
-    eprintln!("{:#?}", endpoint);
     assert_eq!(
         endpoint,
         Endpoint::Unroutable {
@@ -244,7 +249,7 @@ async fn test_one_writable_delegated_and_one_writable_new_account() {
             (writable_delegated_id, account_owned_by_delegation_program()),
             (delegation_pda, account_owned_by_delegation_program()),
         ],
-        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
+        Some(dummy_delegation_record_with_owner(Pubkey::new_unique())),
     );
     let writable_new_account_id = Pubkey::new_unique();
     let payer_id = Pubkey::new_unique();
@@ -275,7 +280,6 @@ async fn test_one_writable_delegated_and_one_writable_new_account() {
 
     let endpoint = Endpoint::from(acc_snapshot.clone());
 
-    eprintln!("{:#?}", endpoint);
     assert_eq!(
         endpoint,
         Endpoint::Unroutable {
@@ -292,7 +296,7 @@ async fn test_one_writable_delegated_and_one_writable_new_account() {
 async fn test_one_writable_new_account() {
     let chain_snapshot_provider = setup_chain_snapshot_provider(
         vec![],
-        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
+        Some(dummy_delegation_record_with_owner(Pubkey::new_unique())),
     );
 
     let writable_new_account_id = Pubkey::new_unique();
@@ -321,7 +325,6 @@ async fn test_one_writable_new_account() {
 
     let endpoint = Endpoint::from(acc_snapshot.clone());
 
-    eprintln!("{:#?}", endpoint);
     assert_eq!(
         endpoint,
         Endpoint::Chain {
@@ -339,7 +342,7 @@ async fn test_one_writable_undelegated_that_is_payer() {
     let writable_undelegated_id = Pubkey::new_unique();
     let chain_snapshot_provider = setup_chain_snapshot_provider(
         vec![(writable_undelegated_id, account_owned_by_system_program())],
-        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
+        Some(dummy_delegation_record_with_owner(Pubkey::new_unique())),
     );
 
     let acc_holder = TransactionAccountsHolder {
@@ -365,7 +368,6 @@ async fn test_one_writable_undelegated_that_is_payer() {
 
     let endpoint = Endpoint::from(acc_snapshot.clone());
 
-    eprintln!("{:#?}", endpoint);
     assert_eq!(
         endpoint,
         Endpoint::Chain {
@@ -385,7 +387,7 @@ async fn test_one_writable_undelegated_that_is_payer_and_one_writable_delegated(
             (delegation_pda, account_owned_by_delegation_program()),
             (writable_undelegated_id, account_owned_by_system_program()),
         ],
-        Some(DelegationRecord::default_with_owner(writable_delegated_id)),
+        Some(dummy_delegation_record_with_owner(writable_delegated_id)),
     );
 
     let acc_holder = TransactionAccountsHolder {
@@ -414,7 +416,6 @@ async fn test_one_writable_undelegated_that_is_payer_and_one_writable_delegated(
 
     let endpoint = Endpoint::from(acc_snapshot.clone());
 
-    eprintln!("{:#?}", endpoint);
     assert_eq!(
         endpoint,
         Endpoint::Ephemeral {
@@ -437,7 +438,7 @@ async fn test_account_meta_one_writable_undelegated_that_is_payer_and_writable_u
                 account_owned_by_system_program(),
             ),
         ],
-        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
+        Some(dummy_delegation_record_with_owner(Pubkey::new_unique())),
     );
 
     let acc_holder = TransactionAccountsHolder {
@@ -469,7 +470,6 @@ async fn test_account_meta_one_writable_undelegated_that_is_payer_and_writable_u
 
     let endpoint = Endpoint::from(acc_snapshot.clone());
 
-    eprintln!("{:#?}", endpoint);
     assert_eq!(
         endpoint,
         Endpoint::Chain {
@@ -482,7 +482,7 @@ async fn test_account_meta_one_writable_undelegated_that_is_payer_and_writable_u
 async fn test_two_readonly_new_accounts() {
     let chain_snapshot_provider = setup_chain_snapshot_provider(
         vec![],
-        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
+        Some(dummy_delegation_record_with_owner(Pubkey::new_unique())),
     );
 
     let readonly1_new_account_id = Pubkey::new_unique();
@@ -515,7 +515,6 @@ async fn test_two_readonly_new_accounts() {
 
     let endpoint = Endpoint::from(acc_snapshot.clone());
 
-    eprintln!("{:#?}", endpoint);
     assert_eq!(
         endpoint,
         Endpoint::Chain {
@@ -529,7 +528,7 @@ async fn test_two_readonly_new_accounts_and_one_writable_undelegated() {
     let writable_undelegated_id = Pubkey::new_unique();
     let chain_snapshot_provider = setup_chain_snapshot_provider(
         vec![(writable_undelegated_id, account_owned_by_system_program())],
-        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
+        Some(dummy_delegation_record_with_owner(Pubkey::new_unique())),
     );
     let readonly1_new_account_id = Pubkey::new_unique();
     let readonly2_new_account_id = Pubkey::new_unique();
@@ -563,7 +562,6 @@ async fn test_two_readonly_new_accounts_and_one_writable_undelegated() {
 
     let endpoint = Endpoint::from(acc_snapshot.clone());
 
-    eprintln!("{:#?}", endpoint);
     assert_eq!(
         endpoint,
         Endpoint::Chain {
@@ -582,7 +580,7 @@ async fn test_two_readonly_undelegated_and_one_writable_new_account() {
             (readonly1_undelegated_id, account_owned_by_system_program()),
             (readonly2_undelegated_id, program_account()),
         ],
-        Some(DelegationRecord::default_with_owner(Pubkey::new_unique())),
+        Some(dummy_delegation_record_with_owner(Pubkey::new_unique())),
     );
     let payer_id = Pubkey::new_unique();
 
@@ -614,7 +612,6 @@ async fn test_two_readonly_undelegated_and_one_writable_new_account() {
 
     let endpoint = Endpoint::from(acc_snapshot.clone());
 
-    eprintln!("{:#?}", endpoint);
     assert_eq!(
         endpoint,
         Endpoint::Chain {

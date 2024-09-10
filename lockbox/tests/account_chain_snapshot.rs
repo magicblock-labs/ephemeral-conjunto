@@ -19,11 +19,12 @@ use solana_sdk::{account::Account, clock::Slot, pubkey::Pubkey};
 
 const EXPECTED_SLOT: Slot = 42;
 
-fn default_delegation_record() -> DelegationRecord {
+fn dummy_delegation_record() -> DelegationRecord {
     DelegationRecord {
-        commit_frequency: CommitFrequency::Millis(1_000),
+        authority: Pubkey::new_unique(),
         owner: Pubkey::new_unique(),
         delegation_slot: 0,
+        commit_frequency: CommitFrequency::Millis(1_000),
     }
 }
 
@@ -50,7 +51,7 @@ fn setup(
 #[tokio::test]
 async fn test_delegate_properly_delegated() {
     let (pubkey, delegation_pda) = delegated_account_ids();
-    let delegation_record = default_delegation_record();
+    let delegation_record = dummy_delegation_record();
     let account_chain_snapshot_provider = setup(
         vec![
             (pubkey, account_owned_by_delegation_program()),
@@ -165,7 +166,7 @@ async fn test_delegate_missing_delegate_account() {
 #[tokio::test]
 async fn test_delegate_delegation_not_owned_by_delegate_program() {
     let (pubkey, delegation_pda) = delegated_account_ids();
-    let delegation_record = default_delegation_record();
+    let delegation_record = dummy_delegation_record();
     let account_chain_snapshot_provider = setup(
         vec![
             (pubkey, account_owned_by_delegation_program()),

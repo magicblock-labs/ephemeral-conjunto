@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use conjunto_core::{
     delegation_record::{CommitFrequency, DelegationRecord},
     AccountProvider,
@@ -13,13 +11,14 @@ use conjunto_providers::{
     rpc_provider_config::RpcProviderConfig,
 };
 use conjunto_test_tools::delegation_record_parser_stub::DelegationRecordParserStub;
-use solana_sdk::{pubkey::Pubkey, system_program};
+use solana_sdk::{pubkey, pubkey::Pubkey, system_program};
 
-fn default_delegation_record() -> DelegationRecord {
+fn dummy_delegation_record() -> DelegationRecord {
     DelegationRecord {
-        commit_frequency: CommitFrequency::Millis(1_000),
+        authority: Pubkey::new_unique(),
         owner: Pubkey::new_unique(),
         delegation_slot: 0,
+        commit_frequency: CommitFrequency::Millis(1_000),
     }
 }
 
@@ -29,17 +28,14 @@ async fn test_known_delegation() {
     let rpc_account_provider =
         RpcAccountProvider::new(RpcProviderConfig::devnet());
 
-    let pubkey =
-        Pubkey::from_str("8k2V7EzQtNg38Gi9HK5ZtQYp1YpGKNGrMcuGa737gZX4")
-            .unwrap();
+    let pubkey = pubkey!("8k2V7EzQtNg38Gi9HK5ZtQYp1YpGKNGrMcuGa737gZX4");
 
     let (at_slot, account) =
         rpc_account_provider.get_account(&pubkey).await.unwrap();
 
     let delegation_pda =
-        Pubkey::from_str("CkieZJmrj6dLhwteG69LSutpWwRHiDJY9S8ua7xJ7CRW")
-            .unwrap();
-    let delegation_record = default_delegation_record();
+        pubkey!("CkieZJmrj6dLhwteG69LSutpWwRHiDJY9S8ua7xJ7CRW");
+    let delegation_record = dummy_delegation_record();
 
     let mut delegation_record_parser = DelegationRecordParserStub::default();
     delegation_record_parser.set_next_record(delegation_record.clone());
