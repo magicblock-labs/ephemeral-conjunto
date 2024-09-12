@@ -1,3 +1,4 @@
+use conjunto_core::delegation_inconsistency::DelegationInconsistency;
 use conjunto_lockbox::{
     account_chain_snapshot::AccountChainSnapshot,
     account_chain_state::AccountChainState,
@@ -18,6 +19,24 @@ fn transaction_accounts_validator() -> TransactionAccountsValidatorImpl {
     TransactionAccountsValidatorImpl {}
 }
 
+fn chain_snapshot_new_account() -> AccountChainSnapshotShared {
+    AccountChainSnapshot {
+        pubkey: Pubkey::new_unique(),
+        at_slot: 42,
+        chain_state: AccountChainState::NewAccount,
+    }
+    .into()
+}
+fn chain_snapshot_undelegated() -> AccountChainSnapshotShared {
+    AccountChainSnapshot {
+        pubkey: Pubkey::new_unique(),
+        at_slot: 42,
+        chain_state: AccountChainState::Undelegated {
+            account: account_owned_by_system_program(),
+        },
+    }
+    .into()
+}
 fn chain_snapshot_delegated() -> AccountChainSnapshotShared {
     AccountChainSnapshot {
         pubkey: Pubkey::new_unique(),
@@ -35,24 +54,6 @@ fn chain_snapshot_delegated() -> AccountChainSnapshotShared {
     }
     .into()
 }
-fn chain_snapshot_undelegated() -> AccountChainSnapshotShared {
-    AccountChainSnapshot {
-        pubkey: Pubkey::new_unique(),
-        at_slot: 42,
-        chain_state: AccountChainState::Undelegated {
-            account: account_owned_by_system_program(),
-        },
-    }
-    .into()
-}
-fn chain_snapshot_new_account() -> AccountChainSnapshotShared {
-    AccountChainSnapshot {
-        pubkey: Pubkey::new_unique(),
-        at_slot: 42,
-        chain_state: AccountChainState::NewAccount,
-    }
-    .into()
-}
 fn chain_snapshot_inconsistent() -> AccountChainSnapshotShared {
     AccountChainSnapshot {
         pubkey: Pubkey::new_unique(),
@@ -60,7 +61,7 @@ fn chain_snapshot_inconsistent() -> AccountChainSnapshotShared {
         chain_state: AccountChainState::Inconsistent {
             account: account_owned_by_system_program(),
             delegation_pda: Pubkey::new_unique(),
-            delegation_inconsistencies: vec![],
+            delegation_inconsistency: DelegationInconsistency::AccountNotFound,
         },
     }
     .into()

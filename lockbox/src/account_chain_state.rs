@@ -32,7 +32,7 @@ pub enum AccountChainState {
     Inconsistent {
         account: Account,
         delegation_pda: Pubkey,
-        delegation_inconsistencies: Vec<DelegationInconsistency>,
+        delegation_inconsistency: DelegationInconsistency,
     },
 }
 

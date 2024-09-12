@@ -1,6 +1,5 @@
 use conjunto_core::{
     delegation_inconsistency::DelegationInconsistency,
-    delegation_record::DelegationRecord,
     delegation_record_parser::DelegationRecordParser, AccountProvider,
 };
 use dlp::pda;
@@ -19,11 +18,6 @@ pub struct AccountChainSnapshotProvider<
 > {
     account_provider: T,
     delegation_record_parser: U,
-}
-
-enum AccountChainSnapshotProviderDelegation {
-    Valid(DelegationRecord),
-    Invalid(Vec<DelegationInconsistency>),
 }
 
 impl<T: AccountProvider, U: DelegationRecordParser>
@@ -73,76 +67,64 @@ impl<T: AccountProvider, U: DelegationRecordParser>
             });
         }
         // Check if the base account exists (it should always be account at index[1])
-        let base_account = match fetched_accounts.remove(1) {
+        let account = match fetched_accounts.remove(1) {
             Some(account) => account,
             None => return Ok(AccountChainState::NewAccount),
         };
         // Check if the base account is locked by the delegation program
-        if !is_owned_by_delegation_program(&base_account) {
-            return Ok(AccountChainState::Undelegated {
-                account: base_account,
-            });
+        if !is_owned_by_delegation_program(&account) {
+            return Ok(AccountChainState::Undelegated { account });
         }
         // Verify the delegation account exists and is owned by the delegation program
-        match self.read_delegated_account_from_fetched_account(
+        self.read_delegated_account_from_fetched_account(
+            account,
+            delegation_pda,
             fetched_accounts.remove(0),
-        ) {
-            AccountChainSnapshotProviderDelegation::Valid(
-                delegation_record,
-            ) => Ok(AccountChainState::Delegated {
-                account: base_account,
-                delegation_pda,
-                delegation_record,
-            }),
-            AccountChainSnapshotProviderDelegation::Invalid(
-                delegation_inconsistencies,
-            ) => Ok(AccountChainState::Inconsistent {
-                account: base_account,
-                delegation_pda,
-                delegation_inconsistencies,
-            }),
-        }
+        )
     }
 
     fn read_delegated_account_from_fetched_account(
         &self,
+        account: Account,
+        delegation_pda: Pubkey,
         fetched_delegation_account: Option<Account>,
-    ) -> AccountChainSnapshotProviderDelegation {
+    ) -> LockboxResult<AccountChainState> {
         let delegation_account = match fetched_delegation_account {
             None => {
-                return AccountChainSnapshotProviderDelegation::Invalid(vec![
-                    DelegationInconsistency::AccountNotFound,
-                ])
+                return Ok(AccountChainState::Inconsistent {
+                    account,
+                    delegation_pda,
+                    delegation_inconsistency:
+                        DelegationInconsistency::AccountNotFound,
+                })
             }
             Some(account) => account,
         };
-        let mut inconsistencies = vec![];
         if !is_owned_by_delegation_program(&delegation_account) {
-            inconsistencies.push(DelegationInconsistency::AccountInvalidOwner);
+            return Ok(AccountChainState::Inconsistent {
+                account,
+                delegation_pda,
+                delegation_inconsistency:
+                    DelegationInconsistency::AccountInvalidOwner,
+            });
         }
         match self
             .delegation_record_parser
             .try_parse(&delegation_account.data)
         {
-            Ok(delegation_record) => {
-                if inconsistencies.is_empty() {
-                    AccountChainSnapshotProviderDelegation::Valid(
-                        delegation_record,
-                    )
-                } else {
-                    AccountChainSnapshotProviderDelegation::Invalid(
-                        inconsistencies,
-                    )
-                }
-            }
-            Err(err) => {
-                inconsistencies.push(
+            Ok(delegation_record) => Ok(AccountChainState::Delegated {
+                account,
+                delegation_pda,
+                delegation_record,
+            }),
+            Err(err) => Ok(AccountChainState::Inconsistent {
+                account,
+                delegation_pda,
+                delegation_inconsistency:
                     DelegationInconsistency::RecordAccountDataInvalid(
                         err.to_string(),
                     ),
-                );
-                AccountChainSnapshotProviderDelegation::Invalid(inconsistencies)
-            }
+            }),
         }
     }
 }

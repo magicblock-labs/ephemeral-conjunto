@@ -42,14 +42,3 @@ pub struct DelegationRecord {
     /// The frequency at which to commit the account state of the ephemeral validator back to the chain.
     pub commit_frequency: CommitFrequency,
 }
-
-impl DelegationRecord {
-    pub fn default_with_owner(owner: Pubkey) -> Self {
-        Self {
-            authority: Pubkey::default(),
-            owner,
-            delegation_slot: 0,
-            commit_frequency: CommitFrequency::Millis(1_000),
-        }
-    }
-}
