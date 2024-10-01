@@ -4,7 +4,7 @@ use conjunto_lockbox::{
     account_chain_state::AccountChainState,
 };
 use conjunto_test_tools::accounts::{
-    account_owned_by_delegation_program, account_owned_by_system_program,
+    account_owned_by_delegation_program, account_with_data,
 };
 use conjunto_transwise::{
     transaction_accounts_snapshot::TransactionAccountsSnapshot,
@@ -13,17 +13,20 @@ use conjunto_transwise::{
     },
     AccountChainSnapshotShared, CommitFrequency, DelegationRecord,
 };
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{pubkey::Pubkey, system_program};
 
 fn transaction_accounts_validator() -> TransactionAccountsValidatorImpl {
     TransactionAccountsValidatorImpl {}
 }
 
-fn chain_snapshot_new_account() -> AccountChainSnapshotShared {
+fn chain_snapshot_wallet() -> AccountChainSnapshotShared {
     AccountChainSnapshot {
         pubkey: Pubkey::new_unique(),
         at_slot: 42,
-        chain_state: AccountChainState::NewAccount,
+        chain_state: AccountChainState::Wallet {
+            lamports: 42,
+            owner: system_program::ID,
+        },
     }
     .into()
 }
@@ -32,7 +35,9 @@ fn chain_snapshot_undelegated() -> AccountChainSnapshotShared {
         pubkey: Pubkey::new_unique(),
         at_slot: 42,
         chain_state: AccountChainState::Undelegated {
-            account: account_owned_by_system_program(),
+            account: account_with_data(),
+            delegation_inconsistency:
+                DelegationInconsistency::AccountInvalidOwner,
         },
     }
     .into()
@@ -43,7 +48,6 @@ fn chain_snapshot_delegated() -> AccountChainSnapshotShared {
         at_slot: 42,
         chain_state: AccountChainState::Delegated {
             account: account_owned_by_delegation_program(),
-            delegation_pda: Pubkey::new_unique(),
             delegation_record: DelegationRecord {
                 authority: Pubkey::new_unique(),
                 owner: Pubkey::new_unique(),
@@ -54,41 +58,34 @@ fn chain_snapshot_delegated() -> AccountChainSnapshotShared {
     }
     .into()
 }
-fn chain_snapshot_inconsistent() -> AccountChainSnapshotShared {
-    AccountChainSnapshot {
-        pubkey: Pubkey::new_unique(),
-        at_slot: 42,
-        chain_state: AccountChainState::Inconsistent {
-            account: account_owned_by_system_program(),
-            delegation_pda: Pubkey::new_unique(),
-            delegation_inconsistency: DelegationInconsistency::AccountNotFound,
-        },
-    }
-    .into()
-}
 
 #[test]
-fn test_two_readonly_undelegated_and_two_writable_delegated_and_payer() {
+fn test_two_readonly_undelegated_and_two_writable_delegated_and_wallets() {
     let readonly_undelegated1 = chain_snapshot_undelegated();
     let readonly_undelegated2 = chain_snapshot_undelegated();
+    let readonly_wallet = chain_snapshot_wallet();
     let writable_delegated1 = chain_snapshot_delegated();
     let writable_delegated2 = chain_snapshot_delegated();
-    let writable_undelegated_payer = chain_snapshot_undelegated();
+    let writable_wallet = chain_snapshot_wallet();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
-                payer: writable_undelegated_payer.pubkey.clone(),
-                readonly: vec![readonly_undelegated1, readonly_undelegated2],
+                payer: writable_wallet.pubkey,
+                readonly: vec![
+                    readonly_undelegated1,
+                    readonly_undelegated2,
+                    readonly_wallet,
+                ],
                 writable: vec![
                     writable_delegated1,
                     writable_delegated2,
-                    writable_undelegated_payer,
+                    writable_wallet,
                 ],
             },
         );
 
-    // This is a fairly typical case that should work (payer and writables are in good condition)
+    // This is a fairly typical case that should work (wallet and writables are in good condition)
     assert!(result.is_ok());
 }
 
@@ -103,12 +100,12 @@ fn test_empty_transaction_accounts() {
             },
         );
 
-    // Empty transactions are missing a payer, we allow that for now
+    // No data writables, so it's fine (solana will deny the transaction tho, because no payer)
     assert!(result.is_ok());
 }
 
 #[test]
-fn test_only_one_readonly_undelegated_non_payer() {
+fn test_only_one_readonly_undelegated() {
     let readonly_undelegated = chain_snapshot_undelegated();
 
     let result = transaction_accounts_validator()
@@ -120,12 +117,12 @@ fn test_only_one_readonly_undelegated_non_payer() {
             },
         );
 
-    // This transaction is missing a payer, we allow that for now
+    // No data writables, so it's fine (solana will deny the transaction tho, because no payer)
     assert!(result.is_ok());
 }
 
 #[test]
-fn test_only_one_writable_delegated_non_payer() {
+fn test_only_one_writable_delegated() {
     let writable_delegated = chain_snapshot_delegated();
 
     let result = transaction_accounts_validator()
@@ -137,93 +134,129 @@ fn test_only_one_writable_delegated_non_payer() {
             },
         );
 
-    // This transaction is missing a payer, we allow that for now
+    // No data writables, so it's fine (solana will deny the transaction tho, because no payer)
     assert!(result.is_ok());
 }
 
 #[test]
-fn test_only_one_readable_undelegated_payer() {
-    let readable_undelegated_payer = chain_snapshot_undelegated();
+fn test_only_one_writable_wallet() {
+    let writable_wallet = chain_snapshot_wallet();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
-                payer: readable_undelegated_payer.pubkey.clone(),
-                readonly: vec![readable_undelegated_payer],
+                payer: Pubkey::new_unique(),
+                readonly: vec![],
+                writable: vec![writable_wallet],
+            },
+        );
+
+    // No data writables, so it's fine (solana will deny the transaction tho, because no payer)
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_only_one_readable_undelegated_as_payer() {
+    let readable_undelegated = chain_snapshot_undelegated();
+
+    let result = transaction_accounts_validator()
+        .validate_ephemeral_transaction_accounts(
+            &TransactionAccountsSnapshot {
+                payer: readable_undelegated.pubkey,
+                readonly: vec![readable_undelegated],
                 writable: vec![],
             },
         );
 
-    // This transaction's payer is readonly, we allow that for now
+    // No data writables, so it's fine (solana will deny the transaction tho, because invalid payer)
     assert!(result.is_ok());
 }
 
 #[test]
-fn test_only_one_writable_undelegated_payer() {
-    let writable_undelegated_payer = chain_snapshot_undelegated();
+fn test_only_one_writable_undelegated_as_payer_fail() {
+    let writable_undelegated = chain_snapshot_undelegated();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
-                payer: writable_undelegated_payer.pubkey.clone(),
+                payer: writable_undelegated.pubkey,
                 readonly: vec![],
-                writable: vec![writable_undelegated_payer],
+                writable: vec![writable_undelegated],
             },
         );
 
-    // Because there is one writable and it's a payer, this should work even when payer is not delegated
+    // This transaction's payer is data, that's not good, we should NOT allow this
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_only_one_writable_delegated_as_payer() {
+    let writable_delegated = chain_snapshot_delegated();
+
+    let result = transaction_accounts_validator()
+        .validate_ephemeral_transaction_accounts(
+            &TransactionAccountsSnapshot {
+                payer: writable_delegated.pubkey,
+                readonly: vec![],
+                writable: vec![writable_delegated],
+            },
+        );
+
+    // No data writables, so it's fine (solana will deny the transaction tho, because invalid payer)
     assert!(result.is_ok());
 }
 
 #[test]
-fn test_only_one_writable_new_account_payer_fail() {
-    let writable_new_account_payer = chain_snapshot_new_account();
+fn test_only_one_writable_wallet_as_payer() {
+    let writable_wallet = chain_snapshot_wallet();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
-                payer: writable_new_account_payer.pubkey.clone(),
+                payer: writable_wallet.pubkey,
                 readonly: vec![],
-                writable: vec![writable_new_account_payer],
+                writable: vec![writable_wallet],
             },
         );
 
-    // Because there is a payer new account, this should not work
-    assert!(result.is_err());
+    // Because there is a payer a wallet, this should work fine
+    assert!(result.is_ok());
 }
 
 #[test]
-fn test_only_one_writable_inconsistent_payer_fail() {
-    let writable_inconsistent_payer = chain_snapshot_inconsistent();
-
-    let result = transaction_accounts_validator()
-        .validate_ephemeral_transaction_accounts(
-            &TransactionAccountsSnapshot {
-                payer: writable_inconsistent_payer.pubkey.clone(),
-                readonly: vec![],
-                writable: vec![writable_inconsistent_payer],
-            },
-        );
-
-    // Because there is an inconsistent delegation record, this should fail, even if its the payer
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_one_readonly_undelegated_and_payer() {
+fn test_one_readonly_undelegated_and_writable_wallet_as_payer() {
     let readonly_undelegated = chain_snapshot_undelegated();
-    let writable_undelegated_payer = chain_snapshot_undelegated();
+    let writable_wallet = chain_snapshot_wallet();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
-                payer: writable_undelegated_payer.pubkey.clone(),
+                payer: writable_wallet.pubkey,
                 readonly: vec![readonly_undelegated],
-                writable: vec![writable_undelegated_payer],
+                writable: vec![writable_wallet],
             },
         );
 
-    // Even if it's a writable undelegated, it should work because that's our payer
+    // This should work, this is a fairly common case
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_one_readonly_undelegated_and_one_writable_delegated_and_wallet() {
+    let readonly_undelegated = chain_snapshot_undelegated();
+    let writable_delegated = chain_snapshot_delegated();
+    let writable_wallet = chain_snapshot_wallet();
+
+    let result = transaction_accounts_validator()
+        .validate_ephemeral_transaction_accounts(
+            &TransactionAccountsSnapshot {
+                payer: Pubkey::new_unique(),
+                readonly: vec![readonly_undelegated],
+                writable: vec![writable_delegated, writable_wallet],
+            },
+        );
+
+    // This should work, this is a fairly common case
     assert!(result.is_ok());
 }
 
@@ -231,107 +264,76 @@ fn test_one_readonly_undelegated_and_payer() {
 fn test_one_readonly_undelegated_and_one_writable_undelegated_and_payer_fail() {
     let readonly_undelegated = chain_snapshot_undelegated();
     let writable_undelegated = chain_snapshot_undelegated();
-    let writable_undelegated_payer = chain_snapshot_undelegated();
+    let writable_wallet = chain_snapshot_wallet();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
                 payer: Pubkey::new_unique(),
                 readonly: vec![readonly_undelegated],
-                writable: vec![
-                    writable_undelegated,
-                    writable_undelegated_payer,
-                ],
+                writable: vec![writable_undelegated, writable_wallet],
             },
         );
 
-    // Because there is a non-payer writable undelegated, this should not work
+    // Any writable data should fail
     assert!(result.is_err());
 }
 
 #[test]
-fn test_one_readonly_undelegated_and_one_writable_inconsistent_and_payer_fail()
-{
+fn test_one_readonly_undelegated_and_one_writable_undelegated_as_payer_fail() {
     let readonly_undelegated = chain_snapshot_undelegated();
-    let writable_inconsistent = chain_snapshot_inconsistent();
-    let writable_undelegated_payer = chain_snapshot_undelegated();
+    let writable_undelegated = chain_snapshot_undelegated();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
-                payer: Pubkey::new_unique(),
+                payer: writable_undelegated.pubkey,
                 readonly: vec![readonly_undelegated],
-                writable: vec![
-                    writable_inconsistent,
-                    writable_undelegated_payer,
-                ],
+                writable: vec![writable_undelegated],
             },
         );
 
-    // Any writable inconsistent should fail
+    // Payer is data and writable, which is wrong
     assert!(result.is_err());
 }
 
 #[test]
-fn test_one_readonly_new_account_and_payer() {
-    let readonly_new_account = chain_snapshot_new_account();
-    let writable_undelegated_payer = chain_snapshot_undelegated();
+fn test_one_writable_undelegated_and_writable_wallet_as_payer_fail() {
+    let writable_undelegated = chain_snapshot_undelegated();
+    let writable_wallet = chain_snapshot_wallet();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
-                payer: writable_undelegated_payer.pubkey.clone(),
-                readonly: vec![readonly_new_account],
-                writable: vec![writable_undelegated_payer],
-            },
-        );
-
-    // While this is a new account, it's a readonly so we don't need to write to it, so it's valid
-    assert!(result.is_ok());
-}
-
-#[test]
-fn test_one_writable_new_account_and_payer_fail() {
-    let writable_new_account = chain_snapshot_new_account();
-    let writable_undelegated_payer = chain_snapshot_undelegated();
-
-    let result = transaction_accounts_validator()
-        .validate_ephemeral_transaction_accounts(
-            &TransactionAccountsSnapshot {
-                payer: writable_undelegated_payer.pubkey.clone(),
+                payer: writable_wallet.pubkey,
                 readonly: vec![],
-                writable: vec![
-                    writable_new_account,
-                    writable_undelegated_payer,
-                ],
+                writable: vec![writable_undelegated, writable_wallet],
             },
         );
 
-    // while the rest of the transaction is valid, because we have a writable new account, it should fail
+    // Even if the payer is correct, we have a data account as writable so this should not work
     assert!(result.is_err());
 }
 
 #[test]
 fn test_one_of_each_valid_type() {
-    let readonly_new_account = chain_snapshot_new_account();
     let readonly_undelegated = chain_snapshot_undelegated();
     let readonly_delegated = chain_snapshot_delegated();
-    let readonly_inconsistent = chain_snapshot_inconsistent();
+    let readonly_wallet = chain_snapshot_wallet();
 
     let writable_delegated = chain_snapshot_delegated();
-    let writable_undelegated_payer = chain_snapshot_undelegated();
+    let writable_wallet = chain_snapshot_wallet();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
-                payer: writable_undelegated_payer.pubkey.clone(),
+                payer: writable_wallet.pubkey,
                 readonly: vec![
-                    readonly_new_account,
                     readonly_undelegated,
                     readonly_delegated,
-                    readonly_inconsistent,
+                    readonly_wallet,
                 ],
-                writable: vec![writable_delegated, writable_undelegated_payer],
+                writable: vec![writable_delegated, writable_wallet],
             },
         );
 

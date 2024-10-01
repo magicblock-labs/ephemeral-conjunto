@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use async_trait::async_trait;
 use conjunto_core::{errors::CoreResult, AccountProvider};
@@ -7,12 +10,15 @@ use solana_sdk::{account::Account, clock::Slot, pubkey::Pubkey};
 #[derive(Default)]
 pub struct AccountProviderStub {
     pub at_slot: Slot,
-    pub accounts: HashMap<Pubkey, Account>,
+    pub accounts: Arc<RwLock<HashMap<Pubkey, Account>>>,
 }
 
 impl AccountProviderStub {
     pub fn add(&mut self, pubkey: Pubkey, account: Account) {
-        self.accounts.insert(pubkey, account);
+        self.accounts.write().unwrap().insert(pubkey, account);
+    }
+    fn get(&self, pubkey: &Pubkey) -> Option<Account> {
+        self.accounts.read().unwrap().get(pubkey).cloned()
     }
 }
 
@@ -22,7 +28,7 @@ impl AccountProvider for AccountProviderStub {
         &self,
         pubkey: &Pubkey,
     ) -> CoreResult<(Slot, Option<Account>)> {
-        Ok((self.at_slot, self.accounts.get(pubkey).cloned()))
+        Ok((self.at_slot, self.get(pubkey)))
     }
 
     async fn get_multiple_accounts(
@@ -31,10 +37,7 @@ impl AccountProvider for AccountProviderStub {
     ) -> CoreResult<(Slot, Vec<Option<Account>>)> {
         Ok((
             self.at_slot,
-            pubkeys
-                .iter()
-                .map(|pubkey| self.accounts.get(pubkey).cloned())
-                .collect(),
+            pubkeys.iter().map(|pubkey| self.get(pubkey)).collect(),
         ))
     }
 }

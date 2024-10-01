@@ -1,4 +1,5 @@
 use conjunto_core::{
+    delegation_inconsistency::DelegationInconsistency,
     delegation_record::{CommitFrequency, DelegationRecord},
     AccountProvider,
 };
@@ -11,7 +12,11 @@ use conjunto_providers::{
     rpc_provider_config::RpcProviderConfig,
 };
 use conjunto_test_tools::delegation_record_parser_stub::DelegationRecordParserStub;
-use solana_sdk::{pubkey, pubkey::Pubkey, system_program};
+use dlp::consts::DELEGATION_PROGRAM_ID;
+use solana_sdk::{
+    bpf_loader_upgradeable::get_program_data_address,
+    {pubkey, pubkey::Pubkey},
+};
 
 fn dummy_delegation_record() -> DelegationRecord {
     DelegationRecord {
@@ -33,8 +38,6 @@ async fn test_known_delegation() {
     let (at_slot, account) =
         rpc_account_provider.get_account(&pubkey).await.unwrap();
 
-    let delegation_pda =
-        pubkey!("CkieZJmrj6dLhwteG69LSutpWwRHiDJY9S8ua7xJ7CRW");
     let delegation_record = dummy_delegation_record();
 
     let mut delegation_record_parser = DelegationRecordParserStub::default();
@@ -56,19 +59,18 @@ async fn test_known_delegation() {
         chain_snapshot.chain_state,
         AccountChainState::Delegated {
             account: account.unwrap(),
-            delegation_pda,
             delegation_record,
         }
     );
 }
 
 #[tokio::test]
-async fn test_system_account_not_delegated() {
+async fn test_delegation_program_as_data() {
     // NOTE: this test depends on devnet being up
     let rpc_account_provider =
         RpcAccountProvider::new(RpcProviderConfig::devnet());
 
-    let pubkey = system_program::id();
+    let pubkey = get_program_data_address(&DELEGATION_PROGRAM_ID);
 
     let (at_slot, account) =
         rpc_account_provider.get_account(&pubkey).await.unwrap();
@@ -90,7 +92,9 @@ async fn test_system_account_not_delegated() {
     assert_eq!(
         chain_snapshot.chain_state,
         AccountChainState::Undelegated {
-            account: account.unwrap()
+            account: account.unwrap(),
+            delegation_inconsistency:
+                DelegationInconsistency::AccountInvalidOwner,
         }
     );
 }

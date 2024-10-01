@@ -50,11 +50,11 @@ impl TransactionAccountsSnapshot {
         })
     }
 
-    pub fn writable_inconsistent_pubkeys(&self) -> Vec<Pubkey> {
+    pub fn writable_undelegated_pubkeys(&self) -> Vec<Pubkey> {
         self.writable
             .iter()
             .filter(|chain_snapshot| {
-                chain_snapshot.chain_state.is_inconsistent()
+                chain_snapshot.chain_state.is_undelegated()
             })
             .map(|chain_snapshot| chain_snapshot.pubkey)
             .collect()
@@ -64,33 +64,6 @@ impl TransactionAccountsSnapshot {
         self.writable
             .iter()
             .filter(|chain_snapshot| chain_snapshot.chain_state.is_delegated())
-            .map(|chain_snapshot| chain_snapshot.pubkey)
-            .collect()
-    }
-
-    pub fn writable_undelegated_non_payer_pubkeys(&self) -> Vec<Pubkey> {
-        self.writable
-            .iter()
-            .filter(|chain_snapshot| {
-                !chain_snapshot.chain_state.is_delegated()
-                    && (chain_snapshot.pubkey != self.payer)
-            })
-            .map(|chain_snapshot| chain_snapshot.pubkey)
-            .collect()
-    }
-
-    pub fn writable_new_pubkeys(&self) -> Vec<Pubkey> {
-        self.writable
-            .iter()
-            .filter(|chain_snapshot| chain_snapshot.chain_state.is_new())
-            .map(|chain_snapshot| chain_snapshot.pubkey)
-            .collect()
-    }
-
-    pub fn writable_payer_pubkeys(&self) -> Vec<Pubkey> {
-        self.writable
-            .iter()
-            .filter(|chain_snapshot| chain_snapshot.pubkey == self.payer)
             .map(|chain_snapshot| chain_snapshot.pubkey)
             .collect()
     }

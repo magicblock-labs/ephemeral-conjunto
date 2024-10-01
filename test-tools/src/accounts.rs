@@ -24,6 +24,14 @@ pub fn account_owned_by_system_program() -> Account {
     }
 }
 
+pub fn account_with_data() -> Account {
+    Account {
+        owner: Pubkey::new_unique(),
+        data: vec![1, 2, 3, 4],
+        ..Account::default()
+    }
+}
+
 pub fn program_account() -> Account {
     Account {
         executable: true,

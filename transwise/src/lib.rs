@@ -6,6 +6,7 @@ pub mod transaction_accounts_snapshot;
 pub mod transaction_accounts_validator;
 pub mod transwise;
 
+pub use conjunto_core::delegation_inconsistency::DelegationInconsistency;
 pub use conjunto_core::delegation_record::CommitFrequency;
 pub use conjunto_core::delegation_record::DelegationRecord;
 pub use conjunto_lockbox::account_chain_snapshot::AccountChainSnapshot;
