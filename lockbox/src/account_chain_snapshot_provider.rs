@@ -51,6 +51,7 @@ impl<T: AccountProvider, U: DelegationRecordParser>
         let delegation_record_account = fetched_accounts.swap_remove(0);
         // Parse the result into an AccountChainState
         let chain_state = self.try_into_chain_state_from_fetched_accounts(
+            pubkey,
             account,
             delegation_record_account,
         );
@@ -64,13 +65,14 @@ impl<T: AccountProvider, U: DelegationRecordParser>
 
     fn try_into_chain_state_from_fetched_accounts(
         &self,
+        address: &Pubkey,
         account: Option<Account>,
         delegation_record_account: Option<Account>,
     ) -> AccountChainState {
         // Check if the base account exists
         let account = match account {
             None => {
-                return AccountChainState::Wallet {
+                return AccountChainState::FeePayer {
                     lamports: 0,
                     owner: system_program::ID,
                 }
@@ -79,14 +81,17 @@ impl<T: AccountProvider, U: DelegationRecordParser>
         };
         // Check if the base account is locked by the delegation program
         if !is_owned_by_delegation_program(&account) {
-            // If the account is not locked and does not have any data, it's a wallet
-            if account.data.is_empty() {
-                return AccountChainState::Wallet {
+            // If the account is not locked, does not have any data, is on-curve and is system program owned, it's a fee-payer
+            if account.data.is_empty()
+                && system_program::check_id(&account.owner)
+                && address.is_on_curve()
+            {
+                return AccountChainState::FeePayer {
                     lamports: account.lamports,
                     owner: account.owner,
                 };
             }
-            // If the account is no locked and does have data, it's just a data account
+            // If the account is no locked and does not meet the criteria above, it's undelegated
             else {
                 return AccountChainState::Undelegated {
                     account,

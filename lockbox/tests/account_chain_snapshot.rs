@@ -67,7 +67,7 @@ async fn test_snapshot_account_does_not_exist() {
         AccountChainSnapshot {
             pubkey,
             at_slot: EXPECTED_SLOT,
-            chain_state: AccountChainState::Wallet {
+            chain_state: AccountChainState::FeePayer {
                 lamports: 0,
                 owner: system_program::ID
             }
@@ -94,7 +94,7 @@ async fn test_snapshot_account_with_lamports() {
         AccountChainSnapshot {
             pubkey,
             at_slot: EXPECTED_SLOT,
-            chain_state: AccountChainState::Wallet {
+            chain_state: AccountChainState::FeePayer {
                 lamports: 42,
                 owner: system_program::ID
             }

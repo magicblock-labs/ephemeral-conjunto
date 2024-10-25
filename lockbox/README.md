@@ -15,7 +15,7 @@ Accounts are read from a `Pubkey` using `AccountProvider`
   - contains a `Slot` and a `AccountChainState`
 
 - `AccountChainState` enum
-  - can be `Wallet` / `Undelegated` / `Delegated`
+  - can be `FeePayer` / `Undelegated` / `Delegated`
   - contains the `Account` data and the delegation configuration if available
 
 - `AccountChainSnapshotProvider` struct

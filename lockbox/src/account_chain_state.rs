@@ -7,12 +7,14 @@ use solana_sdk::{account::Account, pubkey::Pubkey};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum AccountChainState {
-    /// The wallet account is an account that has no data (optionally lamports)
-    /// - It can be used as a writable in the ephemeral validator
+    /// The feepayer account is an account that has no data (optionally lamports)
+    /// - It can be used as a feepayer in the ephemeral validator
     /// - It should never be allocated in the ephemeral validator
-    /// - It can only be used for lamports transfers!
+    /// - It's owned by the system program
+    /// - It's on curve
+    /// - It can only be used for paying fees!
     /// - Its lamport balance must be escrowed to exist in the ephemeral validator
-    Wallet { lamports: u64, owner: Pubkey },
+    FeePayer { lamports: u64, owner: Pubkey },
     /// The account is not delegated and contains arbitrary data
     /// - It should never be used as writable in the ephemeral validator
     /// - It can be used as a readonly in the ephemeral validator
@@ -30,8 +32,8 @@ pub enum AccountChainState {
 }
 
 impl AccountChainState {
-    pub fn is_wallet(&self) -> bool {
-        matches!(self, AccountChainState::Wallet { .. })
+    pub fn is_feepayer(&self) -> bool {
+        matches!(self, AccountChainState::FeePayer { .. })
     }
     pub fn is_undelegated(&self) -> bool {
         matches!(self, AccountChainState::Undelegated { .. })
@@ -41,7 +43,7 @@ impl AccountChainState {
     }
     pub fn account(&self) -> Option<&Account> {
         match self {
-            AccountChainState::Wallet { .. } => None,
+            AccountChainState::FeePayer { .. } => None,
             AccountChainState::Undelegated { account, .. } => Some(account),
             AccountChainState::Delegated { account, .. } => Some(account),
         }

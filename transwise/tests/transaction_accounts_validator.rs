@@ -19,11 +19,11 @@ fn transaction_accounts_validator() -> TransactionAccountsValidatorImpl {
     TransactionAccountsValidatorImpl {}
 }
 
-fn chain_snapshot_wallet() -> AccountChainSnapshotShared {
+fn chain_snapshot_feepayer() -> AccountChainSnapshotShared {
     AccountChainSnapshot {
         pubkey: Pubkey::new_unique(),
         at_slot: 42,
-        chain_state: AccountChainState::Wallet {
+        chain_state: AccountChainState::FeePayer {
             lamports: 42,
             owner: system_program::ID,
         },
@@ -60,32 +60,32 @@ fn chain_snapshot_delegated() -> AccountChainSnapshotShared {
 }
 
 #[test]
-fn test_two_readonly_undelegated_and_two_writable_delegated_and_wallets() {
+fn test_two_readonly_undelegated_and_two_writable_delegated_and_feepayers() {
     let readonly_undelegated1 = chain_snapshot_undelegated();
     let readonly_undelegated2 = chain_snapshot_undelegated();
-    let readonly_wallet = chain_snapshot_wallet();
+    let readonly_feepayer = chain_snapshot_feepayer();
     let writable_delegated1 = chain_snapshot_delegated();
     let writable_delegated2 = chain_snapshot_delegated();
-    let writable_wallet = chain_snapshot_wallet();
+    let writable_feepayer = chain_snapshot_feepayer();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
-                payer: writable_wallet.pubkey,
+                payer: writable_feepayer.pubkey,
                 readonly: vec![
                     readonly_undelegated1,
                     readonly_undelegated2,
-                    readonly_wallet,
+                    readonly_feepayer,
                 ],
                 writable: vec![
                     writable_delegated1,
                     writable_delegated2,
-                    writable_wallet,
+                    writable_feepayer,
                 ],
             },
         );
 
-    // This is a fairly typical case that should work (wallet and writables are in good condition)
+    // This is a fairly typical case that should work (feepayer and writables are in good condition)
     assert!(result.is_ok());
 }
 
@@ -139,15 +139,15 @@ fn test_only_one_writable_delegated() {
 }
 
 #[test]
-fn test_only_one_writable_wallet() {
-    let writable_wallet = chain_snapshot_wallet();
+fn test_only_one_writable_feepayer() {
+    let writable_feepayer = chain_snapshot_feepayer();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
                 payer: Pubkey::new_unique(),
                 readonly: vec![],
-                writable: vec![writable_wallet],
+                writable: vec![writable_feepayer],
             },
         );
 
@@ -207,15 +207,15 @@ fn test_only_one_writable_delegated_as_payer() {
 }
 
 #[test]
-fn test_only_one_writable_wallet_as_payer() {
-    let writable_wallet = chain_snapshot_wallet();
+fn test_only_one_writable_feepayer_as_payer() {
+    let writable_feepayer = chain_snapshot_feepayer();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
-                payer: writable_wallet.pubkey,
+                payer: writable_feepayer.pubkey,
                 readonly: vec![],
-                writable: vec![writable_wallet],
+                writable: vec![writable_feepayer],
             },
         );
 
@@ -224,16 +224,16 @@ fn test_only_one_writable_wallet_as_payer() {
 }
 
 #[test]
-fn test_one_readonly_undelegated_and_writable_wallet_as_payer() {
+fn test_one_readonly_undelegated_and_writable_feepayer_as_payer() {
     let readonly_undelegated = chain_snapshot_undelegated();
-    let writable_wallet = chain_snapshot_wallet();
+    let writable_feepayer = chain_snapshot_feepayer();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
-                payer: writable_wallet.pubkey,
+                payer: writable_feepayer.pubkey,
                 readonly: vec![readonly_undelegated],
-                writable: vec![writable_wallet],
+                writable: vec![writable_feepayer],
             },
         );
 
@@ -242,17 +242,17 @@ fn test_one_readonly_undelegated_and_writable_wallet_as_payer() {
 }
 
 #[test]
-fn test_one_readonly_undelegated_and_one_writable_delegated_and_wallet() {
+fn test_one_readonly_undelegated_and_one_writable_delegated_and_feepayer() {
     let readonly_undelegated = chain_snapshot_undelegated();
     let writable_delegated = chain_snapshot_delegated();
-    let writable_wallet = chain_snapshot_wallet();
+    let writable_feepayer = chain_snapshot_feepayer();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
                 payer: Pubkey::new_unique(),
                 readonly: vec![readonly_undelegated],
-                writable: vec![writable_delegated, writable_wallet],
+                writable: vec![writable_delegated, writable_feepayer],
             },
         );
 
@@ -264,14 +264,14 @@ fn test_one_readonly_undelegated_and_one_writable_delegated_and_wallet() {
 fn test_one_readonly_undelegated_and_one_writable_undelegated_and_payer_fail() {
     let readonly_undelegated = chain_snapshot_undelegated();
     let writable_undelegated = chain_snapshot_undelegated();
-    let writable_wallet = chain_snapshot_wallet();
+    let writable_feepayer = chain_snapshot_feepayer();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
                 payer: Pubkey::new_unique(),
                 readonly: vec![readonly_undelegated],
-                writable: vec![writable_undelegated, writable_wallet],
+                writable: vec![writable_undelegated, writable_feepayer],
             },
         );
 
@@ -298,16 +298,16 @@ fn test_one_readonly_undelegated_and_one_writable_undelegated_as_payer_fail() {
 }
 
 #[test]
-fn test_one_writable_undelegated_and_writable_wallet_as_payer_fail() {
+fn test_one_writable_undelegated_and_writable_feepayer_as_payer_fail() {
     let writable_undelegated = chain_snapshot_undelegated();
-    let writable_wallet = chain_snapshot_wallet();
+    let writable_feepayer = chain_snapshot_feepayer();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
-                payer: writable_wallet.pubkey,
+                payer: writable_feepayer.pubkey,
                 readonly: vec![],
-                writable: vec![writable_undelegated, writable_wallet],
+                writable: vec![writable_undelegated, writable_feepayer],
             },
         );
 
@@ -319,21 +319,21 @@ fn test_one_writable_undelegated_and_writable_wallet_as_payer_fail() {
 fn test_one_of_each_valid_type() {
     let readonly_undelegated = chain_snapshot_undelegated();
     let readonly_delegated = chain_snapshot_delegated();
-    let readonly_wallet = chain_snapshot_wallet();
+    let readonly_feepayer = chain_snapshot_feepayer();
 
     let writable_delegated = chain_snapshot_delegated();
-    let writable_wallet = chain_snapshot_wallet();
+    let writable_feepayer = chain_snapshot_feepayer();
 
     let result = transaction_accounts_validator()
         .validate_ephemeral_transaction_accounts(
             &TransactionAccountsSnapshot {
-                payer: writable_wallet.pubkey,
+                payer: writable_feepayer.pubkey,
                 readonly: vec![
                     readonly_undelegated,
                     readonly_delegated,
-                    readonly_wallet,
+                    readonly_feepayer,
                 ],
-                writable: vec![writable_delegated, writable_wallet],
+                writable: vec![writable_delegated, writable_feepayer],
             },
         );
 
