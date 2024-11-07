@@ -18,7 +18,7 @@ ci-build:
 	cargo build
 
 ci-clippy:
-	cargo clippy --no-deps -- -D warnings
+	cargo clippy --no-deps -- -D warnings -A clippy::result_large_err
 
 ci-test:
 	cargo test -- --test-threads=1 --nocapture

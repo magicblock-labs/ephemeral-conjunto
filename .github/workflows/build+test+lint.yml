@@ -28,6 +28,7 @@ jobs:
           repository: magicblock-labs/delegation-program
           token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           path: delegation-program
+          ref: v0.1.3
 
       - uses: Swatinem/rust-cache@v2
         with:
