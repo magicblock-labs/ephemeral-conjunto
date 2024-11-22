@@ -7,7 +7,7 @@ use conjunto_lockbox::{
 };
 use futures_util::future::{try_join, try_join_all, TryFutureExt};
 use serde::{Deserialize, Serialize};
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{clock::Slot, pubkey::Pubkey};
 
 use crate::{
     errors::TranswiseResult,
@@ -28,17 +28,24 @@ impl TransactionAccountsSnapshot {
     >(
         holder: &TransactionAccountsHolder,
         account_chain_snapshot_provider: &AccountChainSnapshotProvider<T, V>,
+        min_context_slot: Option<Slot>,
     ) -> TranswiseResult<Self> {
         // Fully parallelize snapshot fetching using join(s)
         let (readonly, writable) = try_join(
             try_join_all(holder.readonly.iter().map(|pubkey| {
                 account_chain_snapshot_provider
-                    .try_fetch_chain_snapshot_of_pubkey(pubkey)
+                    .try_fetch_chain_snapshot_of_pubkey(
+                        pubkey,
+                        min_context_slot,
+                    )
                     .map_ok(AccountChainSnapshotShared::from)
             })),
             try_join_all(holder.writable.iter().map(|pubkey| {
                 account_chain_snapshot_provider
-                    .try_fetch_chain_snapshot_of_pubkey(pubkey)
+                    .try_fetch_chain_snapshot_of_pubkey(
+                        pubkey,
+                        min_context_slot,
+                    )
                     .map_ok(AccountChainSnapshotShared::from)
             })),
         )

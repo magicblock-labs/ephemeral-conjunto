@@ -70,6 +70,7 @@ async fn test_one_undelegated_readonly_and_one_delegated_writable_and_payer() {
     let acc_snapshot = TransactionAccountsSnapshot::from_accounts_holder(
         &acc_holder,
         &chain_snapshot_provider,
+        None,
     )
     .await
     .unwrap();
@@ -125,6 +126,7 @@ async fn test_one_writable_delegated_and_one_writable_undelegated() {
     let acc_snapshot = TransactionAccountsSnapshot::from_accounts_holder(
         &acc_holder,
         &chain_snapshot_provider,
+        None,
     )
     .await
     .unwrap();
@@ -179,6 +181,7 @@ async fn test_one_writable_inconsistent_with_missing_delegation_account() {
     let acc_snapshot = TransactionAccountsSnapshot::from_accounts_holder(
         &acc_holder,
         &chain_snapshot_provider,
+        None,
     )
     .await
     .unwrap();
@@ -226,6 +229,7 @@ async fn test_one_writable_inconsistent_with_invalid_delegation_record() {
     let acc_snapshot = TransactionAccountsSnapshot::from_accounts_holder(
         &acc_holder,
         &chain_snapshot_provider,
+        None,
     )
     .await
     .unwrap();
@@ -270,6 +274,7 @@ async fn test_one_writable_undelegated_with_writable_feepayer() {
     let acc_snapshot = TransactionAccountsSnapshot::from_accounts_holder(
         &acc_holder,
         &chain_snapshot_provider,
+        None,
     )
     .await
     .unwrap();
@@ -317,6 +322,7 @@ async fn test_one_writable_undelegated_as_payer() {
     let acc_snapshot = TransactionAccountsSnapshot::from_accounts_holder(
         &acc_holder,
         &chain_snapshot_provider,
+        None,
     )
     .await
     .unwrap();
@@ -362,6 +368,7 @@ async fn test_one_writable_undelegated_as_payer_and_one_writable_delegated() {
     let acc_snapshot = TransactionAccountsSnapshot::from_accounts_holder(
         &acc_holder,
         &chain_snapshot_provider,
+        None,
     )
     .await
     .unwrap();
@@ -415,6 +422,7 @@ async fn test_two_readonly_datas_and_payer() {
     let acc_snapshot = TransactionAccountsSnapshot::from_accounts_holder(
         &acc_holder,
         &chain_snapshot_provider,
+        None,
     )
     .await
     .unwrap();
@@ -467,6 +475,7 @@ async fn test_two_readonly_undelegated_and_one_writable_undelegated() {
     let acc_snapshot = TransactionAccountsSnapshot::from_accounts_holder(
         &acc_holder,
         &chain_snapshot_provider,
+        None,
     )
     .await
     .unwrap();

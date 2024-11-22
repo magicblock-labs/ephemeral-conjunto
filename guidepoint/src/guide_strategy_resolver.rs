@@ -83,26 +83,29 @@ impl<T: AccountProvider, U: SignatureStatusProvider>
             Ok(pubkey) => pubkey,
             Err(_) => return RequestEndpoint::Chain,
         };
-        let account =
-            match self.ephemeral_account_provider.get_account(&pubkey).await {
-                Ok((_, Some(acc))) => acc,
-                // If the ephemeral validator does not have he account then we go to chain for
-                // single requests and to both for subscriptions (since the account may be created
-                // after the subscription)
-                Ok((_, None)) => {
-                    if is_subscription {
-                        return RequestEndpoint::Both;
-                    } else {
-                        return RequestEndpoint::Chain;
-                    }
-                }
-                Err(err) => {
-                    warn!("Error while fetching account: {:?}", err);
-                    // In case of an error the account does not exist or the RPC client
-                    // ran into an issue. In both cases we default to chain
+        let account = match self
+            .ephemeral_account_provider
+            .get_account(&pubkey, None)
+            .await
+        {
+            Ok((_, Some(acc))) => acc,
+            // If the ephemeral validator does not have he account then we go to chain for
+            // single requests and to both for subscriptions (since the account may be created
+            // after the subscription)
+            Ok((_, None)) => {
+                if is_subscription {
+                    return RequestEndpoint::Both;
+                } else {
                     return RequestEndpoint::Chain;
                 }
-            };
+            }
+            Err(err) => {
+                warn!("Error while fetching account: {:?}", err);
+                // In case of an error the account does not exist or the RPC client
+                // ran into an issue. In both cases we default to chain
+                return RequestEndpoint::Chain;
+            }
+        };
         if is_program && !account.executable {
             RequestEndpoint::Chain
         } else {

@@ -71,6 +71,7 @@ impl Transwise {
         TransactionAccountsSnapshot::from_accounts_holder(
             &TransactionAccountsHolder::try_from(tx)?,
             &self.account_chain_snapshot_provider,
+            None,
         )
         .await
     }
@@ -87,6 +88,7 @@ impl Transwise {
         TransactionAccountsSnapshot::from_accounts_holder(
             &TransactionAccountsHolder::try_from(tx)?,
             &self.account_chain_snapshot_provider,
+            None,
         )
         .await
     }

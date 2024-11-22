@@ -3,7 +3,9 @@ use conjunto_core::{
     delegation_record_parser::DelegationRecordParser, AccountProvider,
 };
 use dlp::{consts::DELEGATION_PROGRAM_ID, pda};
-use solana_sdk::{account::Account, pubkey::Pubkey, system_program};
+use solana_sdk::{
+    account::Account, clock::Slot, pubkey::Pubkey, system_program,
+};
 
 use crate::{
     account_chain_snapshot::AccountChainSnapshot,
@@ -32,12 +34,13 @@ impl<T: AccountProvider, U: DelegationRecordParser>
     pub async fn try_fetch_chain_snapshot_of_pubkey(
         &self,
         pubkey: &Pubkey,
+        min_context_slot: Option<Slot>,
     ) -> LockboxResult<AccountChainSnapshot> {
         let delegation_pda = pda::delegation_record_pda_from_pubkey(pubkey);
         // Fetch the current chain state for revelant accounts (all at once)
         let (at_slot, mut fetched_accounts) = self
             .account_provider
-            .get_multiple_accounts(&[*pubkey, delegation_pda])
+            .get_multiple_accounts(&[*pubkey, delegation_pda], min_context_slot)
             .await?;
         // If something went wrong in the fetch we stop, we should receive 2 accounts exactly every time
         if fetched_accounts.len() != 2 {

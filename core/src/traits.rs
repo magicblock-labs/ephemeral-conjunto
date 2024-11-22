@@ -13,10 +13,12 @@ pub trait AccountProvider:
     async fn get_account(
         &self,
         pubkey: &Pubkey,
+        min_context_slot: Option<Slot>,
     ) -> CoreResult<(Slot, Option<Account>)>;
     async fn get_multiple_accounts(
         &self,
         pubkeys: &[Pubkey],
+        min_context_slot: Option<Slot>,
     ) -> CoreResult<(Slot, Vec<Option<Account>>)>;
 }
 

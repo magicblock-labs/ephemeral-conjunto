@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use conjunto_core::{errors::CoreResult, AccountProvider};
+use solana_account_decoder::UiAccountEncoding;
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
+use solana_rpc_client_api::config::RpcAccountInfoConfig;
 use solana_sdk::{
     account::Account, clock::Slot, commitment_config::CommitmentConfig,
     pubkey::Pubkey,
@@ -33,10 +35,19 @@ impl AccountProvider for RpcAccountProvider {
     async fn get_account(
         &self,
         pubkey: &Pubkey,
+        min_context_slot: Option<Slot>,
     ) -> CoreResult<(Slot, Option<Account>)> {
         let response = self
             .rpc_client
-            .get_account_with_commitment(pubkey, self.rpc_client.commitment())
+            .get_account_with_config(
+                pubkey,
+                RpcAccountInfoConfig {
+                    commitment: Some(self.rpc_client.commitment()),
+                    min_context_slot,
+                    encoding: Some(UiAccountEncoding::Base64Zstd),
+                    data_slice: None,
+                },
+            )
             .await?;
         Ok((response.context.slot, response.value))
     }
@@ -44,12 +55,18 @@ impl AccountProvider for RpcAccountProvider {
     async fn get_multiple_accounts(
         &self,
         pubkeys: &[Pubkey],
+        min_context_slot: Option<Slot>,
     ) -> CoreResult<(Slot, Vec<Option<Account>>)> {
         let response = self
             .rpc_client
-            .get_multiple_accounts_with_commitment(
+            .get_multiple_accounts_with_config(
                 pubkeys,
-                self.rpc_client.commitment(),
+                RpcAccountInfoConfig {
+                    commitment: Some(self.rpc_client.commitment()),
+                    min_context_slot,
+                    encoding: Some(UiAccountEncoding::Base64Zstd),
+                    data_slice: None,
+                },
             )
             .await?;
         Ok((response.context.slot, response.value))
@@ -67,8 +84,10 @@ mod tests {
         // Note: this test relies on devnet
         let rpc_account_provider = RpcAccountProvider::devnet();
         let pubkey = Pubkey::new_from_array([5; 32]);
-        let (_, account) =
-            rpc_account_provider.get_account(&pubkey).await.unwrap();
+        let (_, account) = rpc_account_provider
+            .get_account(&pubkey, None)
+            .await
+            .unwrap();
         assert!(account.is_none());
     }
 
@@ -77,8 +96,10 @@ mod tests {
         // Note: this test relies on devnet
         let rpc_account_provider = RpcAccountProvider::devnet();
         let pubkey = Pubkey::default();
-        let (_, account) =
-            rpc_account_provider.get_account(&pubkey).await.unwrap();
+        let (_, account) = rpc_account_provider
+            .get_account(&pubkey, None)
+            .await
+            .unwrap();
         assert!(account.is_some());
     }
 
@@ -88,7 +109,7 @@ mod tests {
         let rpc_account_provider = RpcAccountProvider::devnet();
         let pubkeys = vec![Pubkey::default(), Pubkey::new_from_array([5; 32])];
         let (_, accounts) = rpc_account_provider
-            .get_multiple_accounts(&pubkeys)
+            .get_multiple_accounts(&pubkeys, None)
             .await
             .unwrap();
         assert_eq!(accounts.len(), 2);
