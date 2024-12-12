@@ -42,7 +42,7 @@ conjunto-guidepoint = { path = "guidepoint" }
 conjunto-providers = { path = "providers" }
 conjunto-test-tools = { path = "test-tools" }
 conjunto-transwise = { path = "transwise" }
-delegation-program = { path = "../delegation-program" }
+magicblock-delegation-program = { version = "0.0.0" }
 env_logger = "0.11.3"
 futures-util = "0.3.30"
 # Needed for (not yet working CORS)
@@ -74,5 +74,5 @@ url = "2.5.0"
 # statements in place, run `cargo update -p solana-program` and/or `cargo update
 # -p solana-zk-token-sdk` to remove extraneous versions from your Cargo.lock
 # file.
-solana-program = { git = "https://github.com/solana-labs/solana", rev = "30adda4a71", package = "solana-program", version = "1.19.0" }
-solana-zk-token-sdk = { git = "https://github.com/solana-labs/solana", rev = "30adda4a71", package = "solana-zk-token-sdk", version = "1.19.0" }
+solana-program = { git = "https://github.com/solana-labs/solana", rev = "30adda4a71", package = "solana-program", version = "=1.19.0" }
+solana-zk-token-sdk = { git = "https://github.com/solana-labs/solana", rev = "30adda4a71", package = "solana-zk-token-sdk", version = "=1.19.0" }

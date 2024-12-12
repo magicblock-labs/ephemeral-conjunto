@@ -7,7 +7,7 @@ use solana_sdk::pubkey;
 
 #[test]
 fn test_delegation_record_parser() {
-    // NOTE: from delegation-program/tests/fixtures/accounts.rs
+    // NOTE: from magicblock-delegation-program/tests/fixtures/accounts.rs
     let delegation_record_account_data: [u8; 88] = [
         100, 0, 0, 0, 0, 0, 0, 0, 168, 101, 177, 208, 38, 36, 83, 217, 138,
         159, 42, 183, 213, 78, 109, 216, 63, 161, 136, 242, 27, 0, 117, 150,
